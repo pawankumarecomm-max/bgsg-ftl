@@ -166,6 +166,24 @@ tr:hover td{background:#f8fafc}
 .doc-row-soon td{background:var(--lorange)!important}
 .doc-note{font-size:12px;color:var(--muted);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+.af-toolbar{display:grid;grid-template-columns:minmax(220px,1.2fr) repeat(4,minmax(150px,.75fr)) auto auto 1fr;gap:8px;margin-bottom:14px;align-items:center}
+.af-check-inline{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.af-check-inline input{accent-color:var(--blue)}
+.af-selected-row td{background:#eff6ff!important}
+.af-shipid{font-family:monospace;font-size:12px;font-weight:700;color:var(--blue);white-space:nowrap}
+.af-summarybar{display:none;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:12px}
+.af-summarybar.show{display:grid}
+.af-sumcard{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px}
+.af-sumcard .mlbl{margin-bottom:4px}
+.af-sumcard .mval{font-size:20px}
+.af-toolbar .sbox,.af-toolbar .flt{width:100%}
+@media (max-width:1200px){
+  .af-toolbar{grid-template-columns:repeat(3,minmax(170px,1fr))}
+}
+@media (max-width:760px){
+  .af-toolbar,.af-summarybar{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -404,25 +422,47 @@ tr:hover td{background:#f8fafc}
     <!-- AGENT FREIGHT -->
     <div id="pg-agentfreight" class="pg">
       <div class="af-summary" id="af-metrics"></div>
-      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
-        <input class="sbox" placeholder="Search agent, vehicle…" oninput="renderAgentFreight(this.value)" style="max-width:240px">
+      <div class="af-toolbar">
+        <input class="sbox" id="af-search" placeholder="Search shipment ID, agent, vehicle…" oninput="renderAgentFreight()">
         <select class="flt" id="af-filter-pod" onchange="renderAgentFreight()">
           <option value="">All Status</option>
           <option value="Pending">⏳ Balance Pending</option>
           <option value="Partial">🔵 Partially Received</option>
           <option value="Settled">✅ Fully Settled</option>
         </select>
-        <span style="font-size:12px;color:var(--muted);margin-left:4px" id="af-balance-alert"></span>
+        <select class="flt" id="af-filter-agent" onchange="renderAgentFreight()">
+          <option value="">All Agents</option>
+        </select>
+        <select class="flt" id="af-filter-vehicle" onchange="renderAgentFreight()">
+          <option value="">All Vehicles</option>
+        </select>
+        <select class="flt" id="af-sort" onchange="renderAgentFreight()">
+          <option value="date_desc">Sort: Date newest</option>
+          <option value="date_asc">Sort: Date oldest</option>
+          <option value="load_desc">Sort: Freight high-low</option>
+          <option value="load_asc">Sort: Freight low-high</option>
+          <option value="comm_desc">Sort: Commission high-low</option>
+          <option value="bal_desc">Sort: Balance high-low</option>
+          <option value="agent_asc">Sort: Agent A-Z</option>
+          <option value="vehicle_asc">Sort: Vehicle A-Z</option>
+        </select>
+        <button class="btn btns" onclick="clearSelectedAF()">Clear selected</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <label class="af-check-inline"><input type="checkbox" id="af-selected-only" onchange="renderAgentFreight()"> Selected only</label>
+          <span style="font-size:12px;color:var(--muted)" id="af-balance-alert"></span>
+        </div>
       </div>
       <div class="card" style="padding:0"><div class="tw"><table>
         <thead><tr>
-          <th>Date</th><th>Agent</th><th>Vehicle</th>
+          <th><input type="checkbox" id="af-check-all" onclick="toggleAllVisibleAF(this.checked)"></th>
+          <th>Shipment ID</th><th>Date</th><th>Agent</th><th>Vehicle</th>
           <th>Loading Amt</th><th>Commission</th><th>Advance Paid</th>
           <th>Balance Due</th><th>Balance Recd</th><th>Net Income</th>
           <th>POD Status</th><th>Actions</th>
         </tr></thead>
         <tbody id="af-tbody"></tbody>
       </table></div></div>
+      <div class="af-summarybar" id="af-selected-summary"></div>
     </div>
 
     <!-- TRANSPORTERS -->
@@ -2036,6 +2076,131 @@ function deleteVehicleDoc(id){
 }
 
 // ── AGENT FREIGHT ─────────────────────────────────
+var AF_STATE={selected:{}, visibleIds:[]};
+
+function afShipmentBaseList(){
+  return (APP.agentFreights||[]).slice().sort(function(a,b){
+    var da=String(a.date||''), db=String(b.date||'');
+    if(da!==db) return da.localeCompare(db);
+    var na=parseInt(String(a.id||'').replace(/\D/g,''),10);
+    var nb=parseInt(String(b.id||'').replace(/\D/g,''),10);
+    if(!isNaN(na) && !isNaN(nb) && na!==nb) return na-nb;
+    return String(a.id||'').localeCompare(String(b.id||''));
+  });
+}
+function afShipmentCode(a){
+  var list=afShipmentBaseList();
+  var idx=list.findIndex(function(x){ return String(x.id||'')===String(a.id||''); });
+  return 'BGSG'+String(idx>=0?idx+1:0).padStart(3,'0');
+}
+function afSelectedIds(){ return Object.keys(AF_STATE.selected||{}).filter(function(id){ return AF_STATE.selected[id]; }); }
+function afSelectedRows(){
+  var sel=AF_STATE.selected||{};
+  return APP.agentFreights.filter(function(a){ return !!sel[String(a.id)]; });
+}
+function afSelectedTotals(rows){
+  rows=rows||afSelectedRows();
+  return rows.reduce(function(s,a){
+    s.count+=1;
+    s.loading+=parseNum(a.loadingAmount);
+    s.comm+=parseNum(a.commissionAmt);
+    s.balance+=Math.max(0,parseNum(a.balanceDue)-parseNum(a.balanceReceived));
+    s.net+=afNetIncome(a);
+    return s;
+  },{count:0,loading:0,comm:0,balance:0,net:0});
+}
+function renderAFSelectedSummary(){
+  var box=document.getElementById('af-selected-summary'); if(!box) return;
+  var t=afSelectedTotals();
+  if(!t.count){
+    box.classList.remove('show');
+    box.innerHTML='';
+    return;
+  }
+  box.classList.add('show');
+  box.innerHTML=
+    '<div class="af-sumcard"><div class="mlbl">Selected Shipments</div><div class="mval">'+t.count+'</div></div>'
+    +'<div class="af-sumcard"><div class="mlbl">Total Freight Value</div><div class="mval" style="color:var(--blue)">'+fmt(t.loading)+'</div></div>'
+    +'<div class="af-sumcard"><div class="mlbl">Commission Value</div><div class="mval" style="color:var(--red)">'+fmt(t.comm)+'</div></div>'
+    +'<div class="af-sumcard"><div class="mlbl">Balance Pending</div><div class="mval" style="color:'+(t.balance>0?'var(--orange)':'var(--green)')+'">'+fmt(t.balance)+'</div></div>'
+    +'<div class="af-sumcard"><div class="mlbl">Net Income</div><div class="mval" style="color:var(--green)">'+fmt(t.net)+'</div></div>';
+}
+function afPopulateFilters(){
+  var agentSel=document.getElementById('af-filter-agent');
+  if(agentSel){
+    var curA=agentSel.value||'';
+    var agents=[...new Set((APP.agentFreights||[]).map(function(a){return String(a.agent||'').trim();}).filter(Boolean))].sort();
+    agentSel.innerHTML='<option value="">All Agents</option>'+agents.map(function(v){return '<option value="'+v.replace(/"/g,'&quot;')+'">'+v+'</option>';}).join('');
+    if(agents.indexOf(curA)>=0) agentSel.value=curA;
+  }
+  var vehSel=document.getElementById('af-filter-vehicle');
+  if(vehSel){
+    var curV=vehSel.value||'';
+    var vehs=[...new Set((APP.agentFreights||[]).map(function(a){return String(a.vehicle||'').trim();}).filter(Boolean))].sort();
+    vehSel.innerHTML='<option value="">All Vehicles</option>'+vehs.map(function(v){return '<option value="'+v.replace(/"/g,'&quot;')+'">'+v+'</option>';}).join('');
+    if(vehs.indexOf(curV)>=0) vehSel.value=curV;
+  }
+}
+function afSortData(data, sortBy){
+  data=data.slice();
+  if(sortBy==='date_asc') return data.sort(function(a,b){ return String(a.date||'').localeCompare(String(b.date||'')); });
+  if(sortBy==='load_desc') return data.sort(function(a,b){ return parseNum(b.loadingAmount)-parseNum(a.loadingAmount) || String(b.date||'').localeCompare(String(a.date||'')); });
+  if(sortBy==='load_asc') return data.sort(function(a,b){ return parseNum(a.loadingAmount)-parseNum(b.loadingAmount) || String(b.date||'').localeCompare(String(a.date||'')); });
+  if(sortBy==='comm_desc') return data.sort(function(a,b){ return parseNum(b.commissionAmt)-parseNum(a.commissionAmt) || String(b.date||'').localeCompare(String(a.date||'')); });
+  if(sortBy==='bal_desc') return data.sort(function(a,b){
+    return (Math.max(0,parseNum(b.balanceDue)-parseNum(b.balanceReceived)) - Math.max(0,parseNum(a.balanceDue)-parseNum(a.balanceReceived)))
+      || String(b.date||'').localeCompare(String(a.date||''));
+  });
+  if(sortBy==='agent_asc') return data.sort(function(a,b){ return String(a.agent||'').localeCompare(String(b.agent||'')) || String(b.date||'').localeCompare(String(a.date||'')); });
+  if(sortBy==='vehicle_asc') return data.sort(function(a,b){ return String(a.vehicle||'').localeCompare(String(b.vehicle||'')) || String(b.date||'').localeCompare(String(a.date||'')); });
+  return data.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')) || String(b.id||'').localeCompare(String(a.id||'')); });
+}
+function afGetFilteredData(){
+  var q=((document.getElementById('af-search')||{}).value||'').trim().toLowerCase();
+  var pod=((document.getElementById('af-filter-pod')||{}).value||'').trim();
+  var agent=((document.getElementById('af-filter-agent')||{}).value||'').trim();
+  var vehicle=((document.getElementById('af-filter-vehicle')||{}).value||'').trim();
+  var selectedOnly=((document.getElementById('af-selected-only')||{}).checked)||false;
+  var sortBy=((document.getElementById('af-sort')||{}).value||'date_desc').trim();
+
+  var data=(APP.agentFreights||[]).filter(function(a){
+    var shipId=afShipmentCode(a).toLowerCase();
+    var hay=[shipId,a.agent,a.vehicle,a.note].join(' ').toLowerCase();
+    if(q && hay.indexOf(q)<0) return false;
+    if(pod){
+      var st=afStatus(a);
+      if(pod==='Pending'&&st!=='Pending') return false;
+      if(pod==='Partial'&&st!=='Partial') return false;
+      if(pod==='Settled'&&st!=='Settled') return false;
+    }
+    if(agent && String(a.agent||'')!==agent) return false;
+    if(vehicle && String(a.vehicle||'')!==vehicle) return false;
+    if(selectedOnly && !AF_STATE.selected[String(a.id)]) return false;
+    return true;
+  });
+  return afSortData(data, sortBy);
+}
+function afSetAllVisible(checked){
+  (AF_STATE.visibleIds||[]).forEach(function(id){
+    AF_STATE.selected[String(id)] = !!checked;
+  });
+}
+function toggleAllVisibleAF(checked){
+  afSetAllVisible(checked);
+  renderAgentFreight();
+}
+function clearSelectedAF(){
+  AF_STATE.selected={};
+  var only=document.getElementById('af-selected-only');
+  if(only) only.checked=false;
+  renderAgentFreight();
+}
+function afToggleSelect(id, checked){
+  AF_STATE.selected[String(id)] = !!checked;
+  renderAFSelectedSummary();
+  var allBox=document.getElementById('af-check-all');
+  if(allBox) allBox.checked=(AF_STATE.visibleIds||[]).length>0 && (AF_STATE.visibleIds||[]).every(function(v){ return !!AF_STATE.selected[String(v)]; });
+}
 function afNetIncome(a){
   // Net income = advance + balance received (both already minus commission since advance = loading - commission - balance)
   return (parseNum(a.advancePaid) + parseNum(a.balanceReceived));
@@ -2055,20 +2220,15 @@ function updateAFBadge(){
   if(b){ b.style.display=pending>0?'inline-block':'none'; b.textContent=pending; }
 }
 
-function renderAgentFreight(q){
-  q=q||'';
-  var pod=document.getElementById('af-filter-pod')?document.getElementById('af-filter-pod').value:'';
-  var data=APP.agentFreights.filter(function(a){
-    if(q&&[a.agent,a.vehicle,a.note].join(' ').toLowerCase().indexOf(q.toLowerCase())<0) return false;
-    if(pod){ var st=afStatus(a); if(pod==='Pending'&&st!=='Pending') return false; if(pod==='Partial'&&st!=='Partial') return false; if(pod==='Settled'&&st!=='Settled') return false; }
-    return true;
-  }).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+function renderAgentFreight(){
+  afPopulateFilters();
+  var data=afGetFilteredData();
+  AF_STATE.visibleIds=data.map(function(a){ return String(a.id); });
 
   var totalLoading=APP.agentFreights.reduce(function(s,a){return s+parseNum(a.loadingAmount);},0);
   var totalComm=APP.agentFreights.reduce(function(s,a){return s+parseNum(a.commissionAmt);},0);
   var totalAdv=APP.agentFreights.reduce(function(s,a){return s+parseNum(a.advancePaid);},0);
   var totalBalDue=APP.agentFreights.reduce(function(s,a){return s+parseNum(a.balanceDue);},0);
-  var totalBalRcvd=APP.agentFreights.reduce(function(s,a){return s+parseNum(a.balanceReceived);},0);
   var totalNet=afTotalIncome();
   var pendingBal=afPendingBalance();
 
@@ -2083,14 +2243,22 @@ function renderAgentFreight(q){
   var alertEl=document.getElementById('af-balance-alert');
   if(alertEl) alertEl.innerHTML=pendingAlert.length>0?'<span style="color:var(--orange);font-weight:700">⚠ '+pendingAlert.length+' POD submitted — balance awaiting payment</span>':'';
 
+  var allVisibleChecked=data.length>0 && data.every(function(a){ return !!AF_STATE.selected[String(a.id)]; });
+  var checkAll=document.getElementById('af-check-all');
+  if(checkAll) checkAll.checked=allVisibleChecked;
+
   document.getElementById('af-tbody').innerHTML=data.length===0?
-    '<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:28px">No agent freight entries. Click "+ Agent Freight" to add one.</td></tr>':
+    '<tr><td colspan="13" style="text-align:center;color:var(--muted);padding:28px">No matching agent freight entries.</td></tr>':
     data.map(function(a){
       var st=afStatus(a);
       var stCls=st==='Settled'?'af-settled':st==='Partial'?'af-partial':'af-pending';
       var net=afNetIncome(a);
       var balRemain=Math.max(0,parseNum(a.balanceDue)-parseNum(a.balanceReceived));
-      return '<tr>'
+      var selected=!!AF_STATE.selected[String(a.id)];
+      var shipId=afShipmentCode(a);
+      return '<tr class="'+(selected?'af-selected-row':'')+'">'
+        +'<td><input type="checkbox" '+(selected?'checked':'')+' onchange="afToggleSelect(\''+a.id+'\',this.checked)"></td>'
+        +'<td class="af-shipid">'+shipId+'</td>'
         +'<td>'+fmtDate(a.date)+'</td>'
         +'<td><strong>'+a.agent+'</strong></td>'
         +'<td class="tmon">'+a.vehicle+'</td>'
@@ -2109,6 +2277,8 @@ function renderAgentFreight(q){
         +'</div></td>'
         +'</tr>';
     }).join('');
+
+  renderAFSelectedSummary();
 }
 
 function calcAF(){
@@ -2196,6 +2366,7 @@ function saveAgentFreight(){
 function deleteAgentFreight(id){
   if(!confirm('Delete this agent freight entry?')) return;
   APP.agentFreights=APP.agentFreights.filter(function(a){return String(a.id)!==String(id);});
+  delete AF_STATE.selected[String(id)];
   renderAgentFreight(); updateAFBadge(); syncSt('save','Saving…');
   sbDelete("agent_freights", id,function(err){ syncSt(err?'err':'ok',err?'Sync error':'Synced ✓'); toast('Deleted.'); });
 }
@@ -2204,7 +2375,7 @@ function openAFDetail(id){
   var a=APP.agentFreights.find(function(x){return String(x.id)===String(id);}); if(!a) return;
   var st=afStatus(a); var balRemain=Math.max(0,parseNum(a.balanceDue)-parseNum(a.balanceReceived));
   var stCls=st==='Settled'?'af-settled':st==='Partial'?'af-partial':'af-pending';
-  document.getElementById('af-detail-title').textContent='Agent Freight — '+a.agent;
+  document.getElementById('af-detail-title').textContent='Agent Freight — '+a.agent+' ('+afShipmentCode(a)+')';
   document.getElementById('af-detail-body').innerHTML=
     '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">'
     +'<div style="background:var(--lblue);border-radius:8px;padding:10px;text-align:center"><div style="font-size:10px;font-weight:700;color:var(--blue);text-transform:uppercase">Loading Amt</div><div style="font-size:18px;font-weight:700;color:var(--navy)">'+fmt(a.loadingAmount)+'</div></div>'
