@@ -1930,10 +1930,10 @@ function gp(name,el){
   else if(name==='drivers'){ mb.textContent='Setup Drivers'; mb.onclick=function(){openDrvSetup();}; }
   else if(name==='vehdocs'){ mb.textContent='+ Vehicle Record'; mb.onclick=function(){openVehicleDocModal();}; setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 50); }
   else if(name==='agentfreight'){ mb.textContent='+ Agent Freight'; mb.onclick=function(){openAgentFreightModal();}; }
-  else if(name==='partymaster'){ mb.textContent='+ Add Party'; mb.onclick=function(){openPartyMasterModal();}; }
-  else if(name==='lr'){ mb.textContent='+ Add LR'; mb.onclick=function(){openLrModal();}; }
-  else if(name==='invoicing'){ mb.textContent='+ Add Invoice'; mb.onclick=function(){openInvoiceModal();}; }
-  else if(name==='vendorpay'){ mb.textContent='+ Add Vendor Payment'; mb.onclick=function(){openVendorPaymentModal();}; }
+  else if(name==='partymaster'){ mb.textContent='+ Add Party'; mb.onclick=function(){openPartyMasterModal();}; setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 50); }
+  else if(name==='lr'){ mb.textContent='+ Add LR'; mb.onclick=function(){openLrModal();}; setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 50); }
+  else if(name==='invoicing'){ mb.textContent='+ Add Invoice'; mb.onclick=function(){openInvoiceModal();}; setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 50); }
+  else if(name==='vendorpay'){ mb.textContent='+ Add Vendor Payment'; mb.onclick=function(){openVendorPaymentModal();}; setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 50); }
   else { eb.textContent='+ Expense'; eb.onclick=function(){openExpModal();}; mb.textContent='+ Add Trip'; mb.onclick=function(){openTripModal();}; }
   curPage=name; renderPage(name);
 }
@@ -3138,8 +3138,21 @@ function saveTrip(){
   syncSt('save','Saving…');
   var done=function(err){
     btn.disabled=false; btn.textContent='Save Trip';
-    if(!err){ saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
-    else { syncSt('err','Sync error'); toast('Saved locally. Sync to Sheet failed.'); }
+    saveAppCache();
+    if(!err){ syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
+    else {
+      var msg=sbErrText(err);
+      if(/column .*trip_code.* does not exist|Could not find.*trip_code|column .*bill_to_consignee.* does not exist|Could not find.*bill_to_consignee|column .*bill_to_gst.* does not exist|Could not find.*bill_to_gst|schema cache/i.test(msg)){
+        syncSt('err','Trips schema update needed');
+        toast('Saved locally. Run trips SQL update for Trip ID / Bill To / GST columns.');
+      } else if(/new row violates row-level security policy|permission denied|401|403/i.test(msg)){
+        syncSt('err','Trips permission error');
+        toast('Saved locally. Trips table RLS/policy is blocking cloud save. Run the trips sync SQL once.');
+      } else {
+        syncSt('err','Sync error');
+        toast('Saved locally. Trips cloud sync failed.');
+      }
+    }
   };
   if(editTripId) sbUpdate("trips", editTripId, tripToRow(trip), function(e){ done(e); });
   else sbInsert("trips", tripToRow(trip), function(e,r){ if(r&&r.id) trip.id=String(r.id); done(e); });
@@ -3348,7 +3361,7 @@ function savePartyMaster(){
   if(editPartyId) APP.partyMasters=(APP.partyMasters||[]).map(function(x){ return String(x.id)===String(editPartyId)?rec:x; }); else APP.partyMasters.push(rec);
   APP.partyMasters.sort(function(a,b){ return String(a.partyName||'').localeCompare(String(b.partyName||'')); });
   closeModal('mo-party'); saveAppCache(); populateConsigneeDatalists(); renderPartyMasters(); syncTripConsigneeGST(true); syncInvoiceCustomerGST(true); syncSt('save','Saving…');
-  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Party saved locally. Create party_masters table in Supabase for cloud sync.':'Party saved locally. Cloud sync error.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast(editPartyId?'Party updated!':'Party saved!'); } };
+  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Party saved locally. Create party_masters table in Supabase for cloud sync.':'Party saved locally. Cloud sync error.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast(editPartyId?'Party updated!':'Party saved!'); setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 150); } };
   if(editPartyId) sbUpdate('party_masters', editPartyId, partyMasterToRow(rec), cb); else sbInsert('party_masters', partyMasterToRow(rec), cb);
 }
 function deletePartyMaster(id){
@@ -3629,7 +3642,7 @@ function saveLr(){
   rec.consignor=rec.consignor||BILL_FROM_COMPANY;
   if(editLrId) APP.lrs=APP.lrs.map(function(x){ return String(x.id)===String(editLrId)?rec:x; }); else APP.lrs.push(rec);
   APP.lrs.sort(sortByDateDesc); closeModal('mo-lr'); renderLR(); saveAppCache(); syncSt('save','Saving…');
-  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'LR saved locally. Create lr_entries table in Supabase for cloud sync.':'LR saved locally. Cloud sync error.'); } else { advanceDocSeries('lr', rec.lrNo); saveAppCache(); syncSt('ok','Synced ✓'); toast(editLrId?'LR updated!':'LR saved!'); } };
+  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'LR saved locally. Create lr_entries table in Supabase for cloud sync.':'LR saved locally. Cloud sync error.'); } else { advanceDocSeries('lr', rec.lrNo); saveAppCache(); syncSt('ok','Synced ✓'); toast(editLrId?'LR updated!':'LR saved!'); setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 150); } };
   if(editLrId) sbUpdate('lr_entries', editLrId, lrToRow(rec), cb); else sbInsert('lr_entries', lrToRow(rec), cb);
 }
 function deleteLr(id){ if(!confirm('Delete this LR entry?')) return; APP.lrs=APP.lrs.filter(function(x){ return String(x.id)!==String(id); }); renderLR(); saveAppCache(); syncSt('save','Saving…'); sbDelete('lr_entries', id, function(err){ if(err){ syncSt('save','Local save only'); toast('LR deleted locally. Cloud table not ready.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast('LR deleted.'); } }); }
@@ -3813,7 +3826,7 @@ function saveInvoice(){
   rec.status=inferInvoiceStatus(rec);
   if(editInvoiceId) APP.invoices=APP.invoices.map(function(x){ return String(x.id)===String(editInvoiceId)?rec:x; }); else APP.invoices.push(rec); APP.invoices.sort(sortByDateDesc);
   closeModal('mo-invoice'); renderInvoices(); saveAppCache(); syncSt('save','Saving…');
-  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Invoice saved locally. Create/alter customer_invoices table in Supabase for cloud sync.':'Invoice saved locally. Cloud sync error.'); } else { advanceDocSeries('invoice', rec.invoiceNo); saveAppCache(); syncSt('ok','Synced ✓'); toast(editInvoiceId?'Invoice updated!':'Invoice saved!'); } };
+  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Invoice saved locally. Create/alter customer_invoices table in Supabase for cloud sync.':'Invoice saved locally. Cloud sync error.'); } else { advanceDocSeries('invoice', rec.invoiceNo); saveAppCache(); syncSt('ok','Synced ✓'); toast(editInvoiceId?'Invoice updated!':'Invoice saved!'); setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 150); } };
   if(editInvoiceId) sbUpdate('customer_invoices', editInvoiceId, invoiceToRow(rec), cb); else sbInsert('customer_invoices', invoiceToRow(rec), cb);
 }
 function deleteInvoice(id){ if(!confirm('Delete this invoice?')) return; APP.invoices=APP.invoices.filter(function(x){ return String(x.id)!==String(id); }); renderInvoices(); saveAppCache(); syncSt('save','Saving…'); sbDelete('customer_invoices', id, function(err){ if(err){ syncSt('save','Local save only'); toast('Invoice deleted locally. Cloud table not ready.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast('Invoice deleted.'); } }); }
@@ -3876,7 +3889,7 @@ function saveVendorPayment(){
   rec.balanceAmount=Math.max(0,(+rec.payableAmount||0)-(+rec.paidAmount||0)); rec.status=inferVendorStatus(rec);
   if(editVendorPayId) APP.vendorPayments=APP.vendorPayments.map(function(x){ return String(x.id)===String(editVendorPayId)?rec:x; }); else APP.vendorPayments.push(rec); APP.vendorPayments.sort(sortByDateDesc);
   closeModal('mo-vendorpay'); renderVendorPayments(); saveAppCache(); syncSt('save','Saving…');
-  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Vendor payment saved locally. Create vendor_payments table in Supabase for cloud sync.':'Vendor payment saved locally. Cloud sync error.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast(editVendorPayId?'Vendor payment updated!':'Vendor payment saved!'); } };
+  var cb=function(err,row){ if(!err&&row&&row.id) rec.id=String(row.id); if(err){ syncSt('save','Local save only'); toast(isMissingTableError(err)?'Vendor payment saved locally. Create vendor_payments table in Supabase for cloud sync.':'Vendor payment saved locally. Cloud sync error.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast(editVendorPayId?'Vendor payment updated!':'Vendor payment saved!'); setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 150); } };
   if(editVendorPayId) sbUpdate('vendor_payments', editVendorPayId, vendorPaymentToRow(rec), cb); else sbInsert('vendor_payments', vendorPaymentToRow(rec), cb);
 }
 function deleteVendorPayment(id){ if(!confirm('Delete this vendor payment entry?')) return; APP.vendorPayments=APP.vendorPayments.filter(function(x){ return String(x.id)!==String(id); }); renderVendorPayments(); saveAppCache(); syncSt('save','Saving…'); sbDelete('vendor_payments', id, function(err){ if(err){ syncSt('save','Local save only'); toast('Vendor payment deleted locally. Cloud table not ready.'); } else { saveAppCache(); syncSt('ok','Synced ✓'); toast('Vendor payment deleted.'); } }); }
