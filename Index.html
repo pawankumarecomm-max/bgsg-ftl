@@ -1162,16 +1162,37 @@ function sbInsert(table, row, cb){
 function sbUpdate(table, id, row, cb){
   sbFetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+encodeURIComponent(id), {method:'PATCH', headers:SB_HDR, body:JSON.stringify(row)}, function(err, r){
     if(err){ if(cb) cb(err); return; }
-    if(!r.ok){ r.text().then(function(t){ if(cb) cb(new Error(t)); }); return; }
-    r.json().then(function(d){ if(cb) cb(null,d); }).catch(function(e){ if(cb) cb(e); });
+    if(!r.ok){ r.text().then(function(t){ if(cb) cb(new Error(table+' UPDATE: '+t)); }); return; }
+    r.json().then(function(d){ if(cb) cb(null, Array.isArray(d)?(d[0]||null):d); }).catch(function(e){ if(cb) cb(e); });
+  }, 0, 10000);
+}
+function sbUpsert(table, row, cb){
+  var hdr=Object.assign({}, SB_HDR, {'Prefer':'resolution=merge-duplicates,return=representation'});
+  sbFetch(SUPA_URL+'/rest/v1/'+table+'?on_conflict=id', {method:'POST', headers:hdr, body:JSON.stringify(row)}, function(err, r){
+    if(err){ if(cb) cb(err); return; }
+    if(!r.ok){ r.text().then(function(t){ if(cb) cb(new Error(table+' UPSERT: '+t)); }); return; }
+    r.json().then(function(d){ if(cb) cb(null, Array.isArray(d)?(d[0]||null):d); }).catch(function(e){ if(cb) cb(e); });
   }, 0, 10000);
 }
 function sbDelete(table, id, cb){
   sbFetch(SUPA_URL+'/rest/v1/'+table+'?id=eq.'+encodeURIComponent(id), {method:'DELETE', headers:SB_HDR}, function(err, r){
     if(err){ if(cb) cb(err); return; }
-    if(!r.ok){ r.text().then(function(t){ if(cb) cb(new Error(t)); }); return; }
-    if(cb) cb(null);
+    if(!r.ok){ r.text().then(function(t){ if(cb) cb(new Error(table+' DELETE: '+t)); }); return; }
+    r.text().then(function(t){
+      var data=[];
+      try{ data=t?JSON.parse(t):[]; }catch(_){ data=[]; }
+      if(cb) cb(null, data);
+    }).catch(function(){ if(cb) cb(null, []); });
   }, 0, 10000);
+}
+function sbDeleteStrict(table, id, cb){
+  sbDelete(table, id, function(err){
+    if(err){ if(cb) cb(err); return; }
+    sbGet(table, 'select=id&id=eq.'+encodeURIComponent(id), function(e, rows){
+      if(!e && rows && rows.length){ if(cb) cb(new Error(table+' DELETE: row still exists after delete')); return; }
+      if(cb) cb(null);
+    });
+  });
 }
 
 // ── Row mappers (JS obj → DB columns) ────────────
@@ -1768,6 +1789,32 @@ var SYNC_BUSY=false;
 var SYNC_TIMER=null;
 var UI_REFRESH_TIMER=null;
 var OPTIONAL_SYNC_TIMER=null;
+var LOCAL_WRITE_BUSY=0;
+var PENDING_SYNC_KEY='bgsg_pending_sync_v1';
+var PENDING_SYNC={};
+function beginLocalWrite(){ LOCAL_WRITE_BUSY++; }
+function endLocalWrite(){ LOCAL_WRITE_BUSY=Math.max(0, LOCAL_WRITE_BUSY-1); }
+function loadPendingSync(){
+  try{ return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY)||'{}')||{}; }
+  catch(err){ return {}; }
+}
+function savePendingSync(){ try{ localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(PENDING_SYNC||{})); }catch(err){} }
+function pendingTable(table){ if(!PENDING_SYNC[table]) PENDING_SYNC[table]={}; return PENDING_SYNC[table]; }
+function markPendingUpsert(table, id, rec){ if(!id) return; pendingTable(table)[String(id)]={op:'upsert', ts:Date.now(), rec:rec}; savePendingSync(); }
+function markPendingDelete(table, id){ if(!id) return; pendingTable(table)[String(id)]={op:'delete', ts:Date.now()}; savePendingSync(); }
+function clearPendingSync(table, id){ var m=pendingTable(table); delete m[String(id)]; savePendingSync(); }
+function applyPendingSync(table, list, normalizer){
+  var rows=(list||[]).slice();
+  var m=pendingTable(table), now=Date.now(), changed=false;
+  Object.keys(m).forEach(function(id){
+    var p=m[id]||{};
+    if(now-(+p.ts||0)>7*24*60*60*1000){ delete m[id]; changed=true; return; }
+    rows=rows.filter(function(x){ return String(x.id)!==String(id); });
+    if(p.op==='upsert' && p.rec){ rows.push(normalizer?normalizer(p.rec):p.rec); }
+  });
+  if(changed) savePendingSync();
+  return rows;
+}
 function saveAppCache(){
   try{
     localStorage.setItem(APP_CACHE_KEY, JSON.stringify({
@@ -1828,6 +1875,7 @@ function scheduleAutoSync(){
   OPTIONAL_SYNC_TIMER=setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 65000);
 }
 
+PENDING_SYNC=loadPendingSync();
 loadCashLocal();
 loadDocSeries();
 
@@ -1853,11 +1901,15 @@ function init(){
 function syncAllFromSupabase(silent, mode){
   mode = mode || 'all';
   if(mode==='all') mode='core';
+  if(LOCAL_WRITE_BUSY>0){
+    setTimeout(function(){ syncAllFromSupabase(silent, mode); }, 1200);
+    return;
+  }
   if(SYNC_BUSY && mode==='core') return;
   var markBusy = mode==='core';
   if(markBusy) SYNC_BUSY=true;
   var coreTasks=[
-    {name:'trips', query:'select=id,date,trip_code,transporter,from_loc,to_loc,vehicle,type,invoice,customer,bill_to_consignee,bill_to_gst,driverno,amount,cng,mcd,other,infreight,pl,status,pod,created_at,updated_at&order=date.desc.nullslast,id.desc', apply:function(d){ APP.trips=(d||[]).map(normalizeTrip).sort(tripSortCompare); }},
+    {name:'trips', query:'select=id,date,trip_code,transporter,from_loc,to_loc,vehicle,type,invoice,customer,bill_to_consignee,bill_to_gst,driverno,amount,cng,mcd,other,infreight,pl,status,pod,created_at,updated_at&order=date.desc.nullslast,id.desc', apply:function(d){ APP.trips=applyPendingSync('trips',(d||[]).map(normalizeTrip),normalizeTrip).sort(tripSortCompare); }},
     {name:'expenses', query:'select=id,trip_id,date,type,amount,note&order=date.desc.nullslast,id.desc', apply:function(d){ APP.expenses=(d||[]).map(normalizeExp).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }},
     {name:'cash_entries', query:'select=id,entry_date,account_name,entry_type,source_party,category,vehicle,particulars,payment_mode,amount,note&order=entry_date.desc.nullslast,id.desc', apply:function(d){ APP.cashEntries=(d||[]).map(normalizeCashEntry).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); }); saveCashLocal(); }, soft:true},
     {name:'cash_transfers', query:'select=id,transfer_date,from_account,to_account,amount,note&order=transfer_date.desc.nullslast,id.desc', apply:function(d){ APP.cashTransfers=(d||[]).map(normalizeCashTransfer).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); saveCashLocal(); }, soft:true},
@@ -1867,7 +1919,7 @@ function syncAllFromSupabase(silent, mode){
   var optionalTasks=[
     {name:'salaries', query:'select=id,month,driver,amount,note&order=month.desc,id.desc', apply:function(d){ APP.salaries=(d||[]).map(normalizeSal).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
     {name:'vehicle_expenses', query:'select=id,month,vehicle,type,amount,note&order=month.desc,id.desc', apply:function(d){ APP.vehicleExpenses=(d||[]).map(normalizeVehicleExp).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
-    {name:'agent_freights', query:'select=id,date,agent,vehicle,loading_amount,advance_paid,commission_pct,commission_amt,balance_due,balance_received,pod_status,note&order=date.desc.nullslast,id.desc', apply:function(d){ APP.agentFreights=(d||[]).map(normalizeAgentFreight).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }, soft:true},
+    {name:'agent_freights', query:'select=id,date,agent,vehicle,loading_amount,advance_paid,commission_pct,commission_amt,balance_due,balance_received,pod_status,note&order=date.desc.nullslast,id.desc', apply:function(d){ APP.agentFreights=applyPendingSync('agent_freights',(d||[]).map(normalizeAgentFreight),normalizeAgentFreight).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }, soft:true},
     {name:'lr_entries', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,lr_no,party_invoice_no,vehicle_no,vehicle_type,from_loc,to_loc,consignor,consignee,no_of_articles,weight_charged,rate_per_kg,freight_amount,billing_type,goods_value,eway_bill_no,description,note,status'), apply:function(d){ APP.lrs=(d||[]).map(normalizeLr).sort(sortByDateDesc); }, soft:true},
     {name:'customer_invoices', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,trip_ids,lr_id,invoice_no,customer,customer_gst,taxable_amount,gst_pct,gst_amount,total_amount,due_date,status,received_amount,note'), apply:function(d){ APP.invoices=(d||[]).map(normalizeInvoice).sort(sortByDateDesc); }, soft:true},
     {name:'vendor_payments', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,lr_id,vendor_name,vendor_invoice_no,vehicle_no,payable_amount,paid_amount,balance_amount,due_date,paid_date,payment_mode,status,note'), apply:function(d){ APP.vendorPayments=(d||[]).map(normalizeVendorPayment).sort(sortByDateDesc); }, soft:true},
@@ -2941,18 +2993,29 @@ function saveAgentFreight(){
   };
   if(editId){ APP.agentFreights=APP.agentFreights.map(function(a){return String(a.id)===String(editId)?rec:a;}); }
   else { APP.agentFreights.push(rec); }
+  markPendingUpsert('agent_freights', rec.id, rec);
+  saveAppCache();
   closeModal('mo-af'); renderAgentFreight(); updateAFBadge();
-  syncSt('save','Saving…');
-  var cb=function(err){ syncSt(err?'err':'ok',err?'Sync error':'Synced ✓'); toast(editId?'Entry updated!':'Agent freight saved! Net: '+fmt(adv+balRcvd)); };
-  if(editId) sbUpdate("agent_freights", editId, afToRow(rec), cb); else sbInsert("agent_freights", afToRow(rec),cb);
+  syncSt('save','Saving…'); beginLocalWrite();
+  sbUpsert('agent_freights', afToRow(rec), function(err,row){
+    endLocalWrite();
+    if(!err && row && row.id){ rec.id=String(row.id); clearPendingSync('agent_freights', rec.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editId?'Entry updated!':'Agent freight saved! Net: '+fmt(adv+balRcvd)); }
+    else { syncSt('err','Sync error'); toast('Saved locally. Agent Freight cloud save failed, will retry when you save/sync again.'); }
+  });
 }
 
 function deleteAgentFreight(id){
   if(!confirm('Delete this agent freight entry?')) return;
   APP.agentFreights=APP.agentFreights.filter(function(a){return String(a.id)!==String(id);});
   delete AF_STATE.selected[String(id)];
-  renderAgentFreight(); updateAFBadge(); syncSt('save','Saving…');
-  sbDelete("agent_freights", id,function(err){ syncSt(err?'err':'ok',err?'Sync error':'Synced ✓'); toast('Deleted.'); });
+  markPendingDelete('agent_freights', id);
+  saveAppCache();
+  renderAgentFreight(); updateAFBadge(); syncSt('save','Deleting…'); beginLocalWrite();
+  sbDeleteStrict('agent_freights', id, function(err){
+    endLocalWrite();
+    if(err){ syncSt('err','Delete sync error'); toast('Deleted locally. Cloud delete failed, so it is hidden here until delete sync succeeds.'); }
+    else { clearPendingSync('agent_freights', id); saveAppCache(); syncSt('ok','Synced ✓'); toast('Deleted.'); }
+  });
 }
 
 function openAFDetail(id){
@@ -3134,12 +3197,15 @@ function saveTrip(){
   }
   var btn=document.getElementById('tripsavebtn'); btn.disabled=true; btn.textContent='Saving…';
   if(editTripId) APP.trips=APP.trips.map(function(t){return String(t.id)===String(editTripId)?trip:t;}); else APP.trips.push(trip);
+  markPendingUpsert('trips', trip.id, trip);
+  saveAppCache();
   closeModal('mo-trip'); renderPage(curPage); populateMonthDropdowns(); populateTripFilters(); populateConsigneeDatalists(); refreshVehicleDocUI(); populateFundDropdowns();
-  syncSt('save','Saving…');
-  var done=function(err){
+  syncSt('save','Saving…'); beginLocalWrite();
+  var done=function(err,row){
+    endLocalWrite();
     btn.disabled=false; btn.textContent='Save Trip';
-    saveAppCache();
-    if(!err){ syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
+    if(!err && row && row.id){ trip.id=String(row.id); clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
+    else if(!err){ clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
     else {
       var msg=sbErrText(err);
       if(/column .*trip_code.* does not exist|Could not find.*trip_code|column .*bill_to_consignee.* does not exist|Could not find.*bill_to_consignee|column .*bill_to_gst.* does not exist|Could not find.*bill_to_gst|schema cache/i.test(msg)){
@@ -3150,19 +3216,24 @@ function saveTrip(){
         toast('Saved locally. Trips table RLS/policy is blocking cloud save. Run the trips sync SQL once.');
       } else {
         syncSt('err','Sync error');
-        toast('Saved locally. Trips cloud sync failed.');
+        toast('Saved locally. Trips cloud sync failed; local edit will not be overwritten by sync.');
       }
     }
   };
-  if(editTripId) sbUpdate("trips", editTripId, tripToRow(trip), function(e){ done(e); });
-  else sbInsert("trips", tripToRow(trip), function(e,r){ if(r&&r.id) trip.id=String(r.id); done(e); });
+  sbUpsert('trips', tripToRow(trip), function(e,r){ done(e,r); });
 }
 function deleteTrip(tid){
   if(!confirm('Delete this trip and all linked expenses?')) return;
   APP.trips=APP.trips.filter(function(t){return String(t.id)!==String(tid);});
   APP.expenses=APP.expenses.filter(function(e){return String(e.tripId)!==String(tid);});
-  renderPage(curPage); updateBadge(); refreshVehicleDocUI(); populateFundDropdowns(); syncSt('save','Saving…');
-  sbDelete("trips", tid, function(err){ if(!err) saveAppCache(); syncSt(err?'err':'ok',err?'Sync error':'Synced ✓'); toast('Trip deleted.'); });
+  markPendingDelete('trips', tid);
+  saveAppCache();
+  renderPage(curPage); updateBadge(); refreshVehicleDocUI(); populateFundDropdowns(); syncSt('save','Deleting…'); beginLocalWrite();
+  sbDeleteStrict('trips', tid, function(err){
+    endLocalWrite();
+    if(err){ syncSt('err','Delete sync error'); toast('Deleted locally. Cloud delete failed, so it is hidden here until delete sync succeeds.'); }
+    else { clearPendingSync('trips', tid); saveAppCache(); syncSt('ok','Synced ✓'); toast('Trip deleted.'); }
+  });
 }
 
 // ── EXPENSE MODAL ─────────────────────────────────
