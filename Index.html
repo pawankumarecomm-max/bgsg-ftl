@@ -758,17 +758,18 @@ tr:hover td{background:#f8fafc}
             </div>
             <div class="ai-config">
               <label>Real AI URL</label>
-              <input class="sbox" id="ai-backend-url" placeholder="https://your-ai-backend.onrender.com/ai">
+              <input class="sbox" id="ai-backend-url" value="https://bgsg-gemini-backend.onrender.com/ai" placeholder="https://your-ai-backend.onrender.com/ai">
               <button class="btn btns" onclick="aiSaveBackendUrl()">Save</button>
+              <button class="btn btns" onclick="aiResetBackendUrl()">Reset URL</button>
               <button class="btn btns btnp" onclick="aiTestBackend()">Test</button>
-              <span class="ai-status" id="ai-backend-status">Local mode</span>
+              <span class="ai-status" id="ai-backend-status">Gemini AI ready</span>
             </div>
             <div id="ai-chat" class="ai-chatbox"></div>
             <div class="ai-tools">
               <input class="sbox" id="ai-question" placeholder="Ask anything about this software or shipment data…" onkeydown="if(event.key==='Enter') aiAsk()">
               <button class="btn btnp" onclick="aiAsk()">Ask</button>
             </div>
-            <div class="ai-note">Real AI mode uses your secure backend URL and sends a compact copy of your saved software data to the backend for answers. Local mode remains available as backup. Never paste OpenAI/Gemini/Claude API keys directly into this HTML.</div>
+            <div class="ai-note">Gemini AI URL is saved permanently by default. You can edit it here only if your backend URL changes. Never paste OpenAI/Gemini/Claude API keys directly into this HTML.</div>
           </div>
         </div>
 
@@ -2111,9 +2112,13 @@ function renderAIAssistant(){
   if(trans.length) aiOnShipmentChange();
 }
 
+var AI_DEFAULT_BACKEND_URL='https://bgsg-gemini-backend.onrender.com/ai';
 var AI_BACKEND_URL_KEY='BGSG_AI_BACKEND_URL';
 function aiGetBackendUrl(){
-  try{return (localStorage.getItem(AI_BACKEND_URL_KEY)||'').trim();}catch(e){return '';}
+  try{
+    var saved=(localStorage.getItem(AI_BACKEND_URL_KEY)||'').trim();
+    return saved || AI_DEFAULT_BACKEND_URL;
+  }catch(e){return AI_DEFAULT_BACKEND_URL;}
 }
 function aiSetBackendStatus(text, cls){
   var el=document.getElementById('ai-backend-status'); if(!el) return;
@@ -2121,14 +2126,20 @@ function aiSetBackendStatus(text, cls){
 }
 function aiLoadBackendUrl(){
   var inp=document.getElementById('ai-backend-url'); if(inp) inp.value=aiGetBackendUrl();
-  aiSetBackendStatus(aiGetBackendUrl()?'Real AI ready':'Local mode', aiGetBackendUrl()?'ok':'');
+  aiSetBackendStatus('Gemini AI ready','ok');
 }
 function aiSaveBackendUrl(){
-  var url=((document.getElementById('ai-backend-url')||{}).value||'').trim();
+  var url=((document.getElementById('ai-backend-url')||{}).value||'').trim() || AI_DEFAULT_BACKEND_URL;
   if(url && !/^https?:\/\//i.test(url)){ toast('Backend URL must start with http:// or https://'); return; }
   try{ localStorage.setItem(AI_BACKEND_URL_KEY,url); }catch(e){}
-  aiSetBackendStatus(url?'Real AI saved':'Local mode', url?'ok':'');
-  toast(url?'Real AI backend saved.':'AI backend removed. Using local mode.');
+  aiSetBackendStatus('Gemini AI saved','ok');
+  toast('Gemini AI backend URL saved.');
+}
+function aiResetBackendUrl(){
+  try{ localStorage.removeItem(AI_BACKEND_URL_KEY); }catch(e){}
+  var inp=document.getElementById('ai-backend-url'); if(inp) inp.value=AI_DEFAULT_BACKEND_URL;
+  aiSetBackendStatus('Gemini AI ready','ok');
+  toast('Gemini AI backend URL reset to default.');
 }
 function aiLimit(arr, n){ return (arr||[]).slice(0,n); }
 function aiBuildDataSnapshot(){
@@ -2136,7 +2147,7 @@ function aiBuildDataSnapshot(){
     id:t.id||'', tripCode:t.tripCode||'', date:aiDateFromAny(t.date)||t.date||'', status:t.status||'', invoice:t.invoice||'', customer:t.customer||'', billTo:getTripConsignee(t)||'', billToGst:t.billToGst||'', from:t.from||'', to:t.to||'', vehicle:t.vehicle||'', driverNo:t.driverno||'', amount:+t.amount||0, cng:+t.cng||0, mcd:+t.mcd||0, other:+t.other||0, infreight:+t.infreight||0, pl:+t.pl||0, pod:t.pod||''
   };});
   var cash=(APP.cashEntries||[]).slice().sort(function(a,b){return aiCompareDate(b.date,a.date);}).map(function(e){return {
-    id:e.id||'', date:aiDateFromAny(e.date||e.entry_date)||e.date||'', account:e.account||'', type:e.type||'', source:e.source||'', category:e.category||'', vehicle:e.vehicle||'', particulars:e.particulars||'', paymentMode:e.paymentMode||'', note:e.note||'', amount:+e.amount||0
+    id:e.id||'', date:aiDateFromAny(e.date||e.entry_date)||e.date||'', account:e.account||'', entryType:e.entryType||e.entry_type||e.type||'', type:e.entryType||e.entry_type||e.type||'', source:e.source||'', category:e.category||'', vehicle:e.vehicle||'', normVehicle:aiVehicleCanonical(e.vehicle||''), particulars:e.particulars||'', paymentMode:e.paymentMode||'', note:e.note||'', amount:+e.amount||0
   };});
   var lrs=(APP.lrs||[]).slice().sort(sortByDateDesc).map(function(x){return {id:x.id||'', date:aiDateFromAny(x.date)||x.date||'', lrNo:x.lrNo||'', tripId:x.tripId||'', partyInvoiceNo:x.partyInvoiceNo||'', vehicleNo:x.vehicleNo||'', from:x.fromLoc||'', to:x.toLoc||'', consignor:x.consignor||'', consignee:x.consignee||'', freightAmount:+x.freightAmount||0, billingType:x.billingType||'', status:x.status||''};});
   var invoices=(APP.invoices||[]).slice().sort(sortByDateDesc).map(function(x){return {id:x.id||'', date:aiDateFromAny(x.date)||x.date||'', invoiceNo:x.invoiceNo||'', customer:x.customer||'', gst:x.customerGst||'', tripId:x.tripId||'', tripIds:x.tripIds||[], taxable:+x.taxableAmount||0, gstAmount:+x.gstAmount||0, total:+x.totalAmount||0, received:+x.receivedAmount||0, dueDate:x.dueDate||'', status:x.status||''};});
@@ -2201,6 +2212,16 @@ function aiAsk(){
   var q=(i.value||'').trim(); if(!q) return;
   aiSay('user',q); i.value='';
   var localAnswer=aiAnswer(q);
+
+  // For totals, expenses, shipments, and other exact data lookups, use the built-in
+  // calculator/search first. Gemini is used for flexible explanations, not for
+  // changing software totals. This prevents AI from guessing wrong amounts.
+  if(aiUseExactLocalAnswer(q, localAnswer)){
+    setTimeout(function(){ aiSay('bot', localAnswer); }, 80);
+    aiSetBackendStatus(aiGetBackendUrl()?'Real AI connected; exact data answered locally':'Local exact data mode', aiGetBackendUrl()?'ok':'');
+    return;
+  }
+
   if(aiGetBackendUrl()){
     var thinking=aiSay('bot','Thinking with real AI on your software data…');
     aiAskBackend(q, localAnswer, thinking);
@@ -2355,13 +2376,22 @@ function aiParseDateRangeFromText(text, mode){
   return {from:'', to:'', label:'all dates', anchor:anchor};
 }
 function aiNormVehicle(v){ return String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function aiVehicleCanonical(v){
+  var s=aiNormVehicle(v);
+  // Indian vehicle numbers are often written both ways: DL01MB4318 and DL1MB4318.
+  // Canonical form removes leading zero in RTO code and in last numeric part.
+  var m=s.match(/^([A-Z]{2})(\d{1,2})([A-Z]{1,3})(\d{3,5})$/);
+  if(m) return m[1]+String(parseInt(m[2],10))+m[3]+String(parseInt(m[4],10));
+  return s.replace(/^([A-Z]{2})0+(\d)/,'$1$2').replace(/([A-Z])0+(\d{3,5})$/,'$1$2');
+}
 function aiVehicleTail(v){ var m=aiNormVehicle(v).match(/(\d{2,5})$/); return m ? String(parseInt(m[1],10)) : ''; }
-function aiVehicleBody(v){ return aiNormVehicle(v).replace(/0*(\d{2,5})$/,''); }
+function aiVehicleBody(v){ return aiVehicleCanonical(v).replace(/0*(\d{2,5})$/,''); }
 function aiVehicleLooseMatch(value, queryVehicle){
   var ev=aiNormVehicle(value), qv=aiNormVehicle(queryVehicle);
-  if(!qv) return true;
-  if(!ev) return false;
-  if(ev===qv || ev.indexOf(qv)>=0 || qv.indexOf(ev)>=0) return true;
+  var ec=aiVehicleCanonical(value), qc=aiVehicleCanonical(queryVehicle);
+  if(!qv && !qc) return true;
+  if(!ev && !ec) return false;
+  if(ev===qv || ec===qc || ev.indexOf(qv)>=0 || qv.indexOf(ev)>=0 || ec.indexOf(qc)>=0 || qc.indexOf(ec)>=0) return true;
   var et=aiVehicleTail(ev), qt=aiVehicleTail(qv);
   if(et && qt && et===qt){
     var eb=aiVehicleBody(ev), qb=aiVehicleBody(qv);
@@ -2378,9 +2408,10 @@ function aiKnownVehicles(){
 }
 function aiFindVehicleInQuestion(q){
   var nq=aiNormVehicle(q), all=aiKnownVehicles(), best='';
+  var cq=nq.replace(/([A-Z]{2})0+(\d)/g,'$1$2').replace(/([A-Z])0+(\d{3,5})/g,'$1$2');
   all.forEach(function(v){
-    var nv=aiNormVehicle(v);
-    if(nv && nq.indexOf(nv)>=0 && nv.length>(aiNormVehicle(best).length||0)) best=v;
+    var nv=aiNormVehicle(v), cv=aiVehicleCanonical(v);
+    if(nv && (nq.indexOf(nv)>=0 || cq.indexOf(cv)>=0) && cv.length>(aiVehicleCanonical(best).length||0)) best=v;
   });
   if(best) return best;
   var m=nq.match(/[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{3,5}/);
@@ -2431,6 +2462,15 @@ function aiCashEntryMatchesCategory(e, cat, q){
   if(cat==='Unloading') return c==='unloading' || /unloading|loader|loading/.test(hay);
   if(cat==='Porter') return c==='porter' || /porter|labour|labor/.test(hay);
   return c===String(cat||'').toLowerCase();
+}
+function aiUseExactLocalAnswer(q, ans){
+  var s=String(q||'').toLowerCase();
+  var a=String(ans||'');
+  // Anything asking totals/lists from saved records must not be re-calculated by the LLM.
+  if(aiExpenseIntent(q) || /(fund|cash|kharcha|kharch|pawan|karan)/.test(s)) return true;
+  if(/^(Matching shipments:|Currently In Transit:|Delivered shipments:|To Be Planned shipments:)/.test(a)) return true;
+  if(/(show|list|total|count|how many|pending|unpaid|paid|delivered|in transit|transit)/.test(s) && /(trip|shipment|vehicle|invoice|lr|vendor|payment|party|pod)/.test(s)) return true;
+  return false;
 }
 function aiFundDiagnostics(vehicle, category, rng, account){
   var entries=APP.cashEntries||[];
