@@ -413,8 +413,55 @@ tr:hover td{background:#f8fafc}
 .drawer-actions .btn{justify-content:center;padding:9px 12px;font-size:13px}
 .drawer-actions .btn-full{grid-column:1/-1}
 
-@media (max-width:1200px){
-  #pg-trips.pg.active{height:auto;min-height:calc(100vh - 94px)}
+/* ── Fund Tracker Cashbook Table ─────────────────────────────────────────── */
+#pg-fundtracker.active{display:flex;flex-direction:column}
+#fund-entries-card{flex:1;min-height:0}
+#fund-entries-wrap{
+  overflow:auto;
+  max-height:calc(100vh - 420px);
+  min-height:220px;
+}
+#fund-entries-table{
+  width:100%;
+  min-width:1020px;
+  table-layout:fixed;
+  border-collapse:collapse;
+}
+#fund-entries-table thead tr th{
+  position:sticky;
+  top:0;
+  z-index:8;
+  background:var(--navy)!important;
+  color:#fff!important;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  padding:8px 8px;
+  white-space:nowrap;
+  border-bottom:2px solid rgba(255,255,255,.15);
+  box-shadow:0 2px 6px rgba(15,33,55,.18);
+}
+#fund-entries-table tbody td{
+  padding:7px 8px;
+  font-size:12px;
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  vertical-align:middle;
+}
+#fund-entries-table tbody tr:hover td{background:#f8fafc}
+#fund-entries-table tbody tr:last-child td{border-bottom:none}
+/* Sticky first col — Date */
+#fund-entries-table thead th:first-child{position:sticky;top:0;left:0;z-index:12}
+#fund-entries-table tbody td:first-child{position:sticky;left:0;z-index:3;background:#fff;box-shadow:1px 0 0 var(--border)}
+#fund-entries-table tbody tr:hover td:first-child{background:#f8fafc}
+/* Amount column right-align */
+#fund-entries-table td:nth-child(10),#fund-entries-table td:nth-child(11){text-align:right;font-family:var(--fd);font-weight:600}
+/* Actions column center */
+#fund-entries-table td:nth-child(12){text-align:center}
+
   #pg-trips .trip-filter-grid-main,#pg-trips .trip-filter-grid-sub{grid-template-columns:repeat(3,minmax(150px,1fr))}
   #pg-trips .trips-table-card{height:calc(100vh - 310px);flex:0 0 auto}
   #trip-drawer{width:320px;right:-340px}
@@ -638,12 +685,27 @@ tr:hover td{background:#f8fafc}
           <div class="tw"><table><thead><tr><th>Category</th><th>Total</th></tr></thead><tbody id="fund-category-body"></tbody></table></div>
         </div>
       </div>
-      <div class="card" id="fund-entries-card" style="padding:0">
+      <div class="card" id="fund-entries-card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
         <div class="cardh"><span class="cardt">All Cashbook Entries</span></div>
-        <div class="tw"><table>
-          <thead><tr><th>Date</th><th>Account</th><th>Type</th><th>Source / Party</th><th>Category</th><th>Vehicle</th><th>Particulars</th><th>Payment Mode</th><th>Note</th><th>Amount</th><th>Avail. Balance</th><th>Actions</th></tr></thead>
-          <tbody id="fund-body"></tbody>
-        </table></div>
+        <div id="fund-entries-wrap">
+          <table id="fund-entries-table">
+            <thead><tr>
+              <th style="width:88px">Date</th>
+              <th style="width:70px">Account</th>
+              <th style="width:74px">Type</th>
+              <th style="width:130px">Source / Party</th>
+              <th style="width:110px">Category</th>
+              <th style="width:90px">Vehicle</th>
+              <th>Particulars</th>
+              <th style="width:86px">Mode</th>
+              <th style="width:110px">Note</th>
+              <th style="width:88px">Amount</th>
+              <th style="width:96px">Balance</th>
+              <th style="width:88px">Actions</th>
+            </tr></thead>
+            <tbody id="fund-body"></tbody>
+          </table>
+        </div>
       </div>
     </div>
     <!-- P&L -->
@@ -1273,7 +1335,7 @@ tr:hover td{background:#f8fafc}
       <div class="fgrid">
         <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="fund-entry-date"></div>
         <div class="fgrp"><label class="flbl">Account</label><select class="finp" id="fund-entry-account"><option>Pawan</option><option>Karan</option></select></div>
-        <div class="fgrp"><label class="flbl">Entry Type</label><select class="finp" id="fund-entry-type" onchange="syncFundEntryForm()"><option>Receipt</option><option>Expense</option></select></div>
+        <div class="fgrp"><label class="flbl">Entry Type</label><select class="finp" id="fund-entry-type" onchange="syncFundEntryForm(null)"><option>Receipt</option><option>Expense</option></select></div>
         <div class="fgrp"><label class="flbl">Source / Party</label><input class="finp" id="fund-entry-source" placeholder="Company / Transporter / Vendor"></div>
         <div class="fgrp"><label class="flbl">Category</label><select class="finp" id="fund-entry-category"></select></div>
         <div class="fgrp"><label class="flbl">Vehicle</label><input class="finp" id="fund-entry-vehicle" list="fund-entry-vehlist" placeholder="Type vehicle number if needed"><datalist id="fund-entry-vehlist"></datalist></div>
@@ -1498,14 +1560,12 @@ function fmtDate(d){
 }
 function today(){ return new Date().toISOString().slice(0,10); }
 function toast(msg){ var t=document.getElementById('toast'); t.textContent=msg; t.className='show'; setTimeout(function(){t.className='';},2800); }
-function syncSt(col,msg){ var el=document.getElementById('syncst'); el.textContent=msg; el.style.color=col==='ok'?'var(--green)':col==='err'?'var(--red)':'var(--orange)'; }
+function syncSt(col,msg){ var el=document.getElementById('syncst'); if(!el) return; el.textContent=msg; el.style.color=col==='ok'?'var(--green)':col==='err'?'var(--red)':'var(--orange)'; }
 function tripPill(t){ var m={'14FT':'p14','17FT':'p17','20FT':'p20','22FT':'p22','32FT':'p32','Bolero':'pbol'}; return '<span class="pill '+(m[t]||'pbol')+'">'+(t||'-')+'</span>'; }
 function plTD(v){ v=+v||0; if(v>0)return '<td class="tpro">'+fmt(v)+'</td>'; if(v<0)return '<td class="tlos">'+fmt(v)+'</td>'; return '<td class="tzer">'+fmt(0)+'</td>'; }
 function getTripExp(tid){ return APP.expenses.filter(function(e){return String(e.tripId)===String(tid);}); }
 function parseNum(v){ return parseFloat(v)||0; }
 
-var CASH_LOCAL_ENTRY_KEY='bgsg_cash_entries';
-var CASH_LOCAL_TRANSFER_KEY='bgsg_cash_transfers';
 var CASH_VEHICLE_MASTER_KEY='bgsg_cash_vehicle_master';
 var CASH_ACCOUNTS=['Pawan','Karan'];
 var CASH_CATEGORIES=['Fund Received','Fuel','Toll Tax','Driver Fooding','Maintenance','Unloading','Porter','Other'];
@@ -1529,29 +1589,14 @@ function normalizeCashEntry(e){
   return { id:String(e.id||''), date:String(e.entry_date||e.date||'').slice(0,10), account:e.account_name||e.account||'Pawan',
     entryType:e.entry_type||e.entryType||'Expense', source:e.source_party||e.source||'', category:e.category||'Other',
     vehicle:e.vehicle||'', particulars:e.particulars||'', paymentMode:e.payment_mode||e.paymentMode||'Cash',
-    amount:parseNum(e.amount), note:e.note||'' };
+    amount:parseNum(e.amount), note:e.note||'', linkedTripId:e.linkedTripId||'' };
 }
 function normalizeCashTransfer(t){
   return { id:String(t.id||''), date:String(t.transfer_date||t.date||'').slice(0,10), fromAccount:t.from_account||t.fromAccount||'Pawan',
     toAccount:t.to_account||t.toAccount||'Karan', amount:parseNum(t.amount), note:t.note||'' };
 }
-function loadCashLocal(){
-  loadCashVehicleMaster();
-  try{
-    var e=JSON.parse(localStorage.getItem(CASH_LOCAL_ENTRY_KEY)||'[]');
-    var t=JSON.parse(localStorage.getItem(CASH_LOCAL_TRANSFER_KEY)||'[]');
-    APP.cashEntries=Array.isArray(e)?e.map(normalizeCashEntry):[];
-    APP.cashTransfers=Array.isArray(t)?t.map(normalizeCashTransfer):[];
-    APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); });
-  }catch(err){ APP.cashEntries=[]; APP.cashTransfers=[]; }
-}
-function saveCashLocal(){
-  try{
-    localStorage.setItem(CASH_LOCAL_ENTRY_KEY, JSON.stringify(APP.cashEntries));
-    localStorage.setItem(CASH_LOCAL_TRANSFER_KEY, JSON.stringify(APP.cashTransfers));
-    saveCashVehicleMaster();
-  }catch(err){}
-}
+function loadCashLocal(){ /* pure cloud – no local cache */ }
+function saveCashLocal(){ /* pure cloud – no local cache */ }
 function cashVehicles(){
   var arr=(CASH_CUSTOM_VEHICLES||[]).concat(APP.cashEntries.map(function(e){return normalizeCashVehicle(e.vehicle);}));
   return [...new Set(arr.filter(Boolean))].sort();
@@ -1656,11 +1701,44 @@ function normalizeMonthVal(v){
   if(/^\d{4}-\d{2}$/.test(s)) return s;
   return s.length>=7?s.slice(0,7):s;
 }
-function recompPL(tid){
+function recompPL(tid, persist){
   var trip=APP.trips.find(function(t){return String(t.id)===String(tid);}); if(!trip) return;
   var exps=getTripExp(tid); var xE=0,xI=0;
   exps.forEach(function(e){ var a=+e.amount||0; if(e.type==='InFreight')xI+=a; else xE+=a; });
+  // P&L = amount - trip-level cng/mcd/other - linked expense totals + infreight
   trip.pl=(+trip.amount||0)-(+trip.cng||0)-(+trip.mcd||0)-(+trip.other||0)-xE+(+trip.infreight||0)+xI;
+  // Persist updated P&L to Supabase
+  if(persist!==false && trip.id && !String(trip.id).startsWith('trip_tmp')){
+    sbUpdate('trips', trip.id, {pl:trip.pl}, function(){});
+  }
+}
+
+// Recompute ALL trips' financials from linked expenses after sync
+// Ensures drawer always reflects true totals regardless of how expense was entered
+function recompAllTripPL(){
+  if(!APP.trips||!APP.trips.length) return;
+  var totals={};
+  (APP.expenses||[]).forEach(function(e){
+    var tid=String(e.tripId||''); if(!tid) return;
+    if(!totals[tid]) totals[tid]={cng:0,mcd:0,other:0,infreight:0};
+    var a=+e.amount||0;
+    if(e.type==='CNG / Fuel')     totals[tid].cng+=a;
+    else if(e.type==='MCD / Tax') totals[tid].mcd+=a;
+    else if(e.type==='InFreight') totals[tid].infreight+=a;
+    else                          totals[tid].other+=a;
+  });
+  APP.trips.forEach(function(trip){
+    var tid=String(trip.id||'');
+    var t=totals[tid]; if(!t) return;
+    var nc=t.cng,nm=t.mcd,no=t.other,ni=t.infreight;
+    var np=(+trip.amount||0)-nc-nm-no+ni;
+    if(nc!==+trip.cng||nm!==+trip.mcd||no!==+trip.other||ni!==+trip.infreight||np!==+trip.pl){
+      trip.cng=nc; trip.mcd=nm; trip.other=no; trip.infreight=ni; trip.pl=np;
+      if(tid&&!tid.startsWith('trip_tmp')){
+        sbUpdate('trips',tid,{cng:nc,mcd:nm,other:no,infreight:ni,pl:np},function(){});
+      }
+    }
+  });
 }
 function updateBadge(){ var b=document.getElementById('expbadge'),n=APP.expenses.length; b.style.display=n>0?'inline-block':'none'; b.textContent=n; }
 function totalSalForMonth(m){ var k=String(m).slice(0,7); return APP.salaries.filter(function(s){return normalizeMonthVal(s.month)===k;}).reduce(function(a,x){return a+(+x.amount||0);},0); }
@@ -2032,75 +2110,20 @@ function tripSortCompare(a,b){
 }
 function sortedTrips(list){ return (list||[]).slice().sort(tripSortCompare); }
 
-var APP_CACHE_KEY='bgsg_app_cache_v7';
 var APP_OPENED=false;
 var SYNC_BUSY=false;
 var SYNC_TIMER=null;
 var UI_REFRESH_TIMER=null;
 var OPTIONAL_SYNC_TIMER=null;
-var LOCAL_WRITE_BUSY=0;
-var PENDING_SYNC_KEY='bgsg_pending_sync_v1';
-var PENDING_SYNC={};
-function beginLocalWrite(){ LOCAL_WRITE_BUSY++; }
-function endLocalWrite(){ LOCAL_WRITE_BUSY=Math.max(0, LOCAL_WRITE_BUSY-1); }
-function loadPendingSync(){
-  try{ return JSON.parse(localStorage.getItem(PENDING_SYNC_KEY)||'{}')||{}; }
-  catch(err){ return {}; }
-}
-function savePendingSync(){ try{ localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify(PENDING_SYNC||{})); }catch(err){} }
-function pendingTable(table){ if(!PENDING_SYNC[table]) PENDING_SYNC[table]={}; return PENDING_SYNC[table]; }
-function markPendingUpsert(table, id, rec){ if(!id) return; pendingTable(table)[String(id)]={op:'upsert', ts:Date.now(), rec:rec}; savePendingSync(); }
-function markPendingDelete(table, id){ if(!id) return; pendingTable(table)[String(id)]={op:'delete', ts:Date.now()}; savePendingSync(); }
-function clearPendingSync(table, id){ var m=pendingTable(table); delete m[String(id)]; savePendingSync(); }
-function applyPendingSync(table, list, normalizer){
-  var rows=(list||[]).slice();
-  var m=pendingTable(table), now=Date.now(), changed=false;
-  Object.keys(m).forEach(function(id){
-    var p=m[id]||{};
-    if(now-(+p.ts||0)>7*24*60*60*1000){ delete m[id]; changed=true; return; }
-    rows=rows.filter(function(x){ return String(x.id)!==String(id); });
-    if(p.op==='upsert' && p.rec){ rows.push(normalizer?normalizer(p.rec):p.rec); }
-  });
-  if(changed) savePendingSync();
-  return rows;
-}
-function saveAppCache(){
-  try{
-    localStorage.setItem(APP_CACHE_KEY, JSON.stringify({
-      savedAt:new Date().toISOString(),
-      app:{
-        trips:APP.trips||[], expenses:APP.expenses||[], salaries:APP.salaries||[], vehicleExpenses:APP.vehicleExpenses||[],
-        agentFreights:APP.agentFreights||[], vehicleDocs:APP.vehicleDocs||[], cashEntries:APP.cashEntries||[], cashTransfers:APP.cashTransfers||[], lrs:APP.lrs||[], invoices:APP.invoices||[], vendorPayments:APP.vendorPayments||[], partyMasters:APP.partyMasters||[]
-      },
-      drivers:DRIVERS||[]
-    }));
-  }catch(err){}
-}
-function loadAppCache(){
-  try{
-    var raw=localStorage.getItem(APP_CACHE_KEY);
-    if(!raw) return false;
-    var parsed=JSON.parse(raw)||{};
-    var app=parsed.app||{};
-    APP.trips=Array.isArray(app.trips)?app.trips.map(normalizeTrip):APP.trips;
-    APP.expenses=Array.isArray(app.expenses)?app.expenses.map(normalizeExp):APP.expenses;
-    APP.salaries=Array.isArray(app.salaries)?app.salaries.map(normalizeSal):APP.salaries;
-    APP.vehicleExpenses=Array.isArray(app.vehicleExpenses)?app.vehicleExpenses.map(normalizeVehicleExp):APP.vehicleExpenses;
-    APP.agentFreights=Array.isArray(app.agentFreights)?app.agentFreights.map(normalizeAgentFreight):APP.agentFreights;
-    APP.vehicleDocs=Array.isArray(app.vehicleDocs)?app.vehicleDocs.map(normalizeVehicleDoc):APP.vehicleDocs;
-    APP.cashEntries=Array.isArray(app.cashEntries)?app.cashEntries.map(normalizeCashEntry):APP.cashEntries;
-    APP.cashTransfers=Array.isArray(app.cashTransfers)?app.cashTransfers.map(normalizeCashTransfer):APP.cashTransfers;
-    APP.lrs=Array.isArray(app.lrs)?app.lrs.map(normalizeLr):APP.lrs;
-    APP.invoices=Array.isArray(app.invoices)?app.invoices.map(normalizeInvoice):APP.invoices;
-    APP.vendorPayments=Array.isArray(app.vendorPayments)?app.vendorPayments.map(normalizeVendorPayment):APP.vendorPayments;
-    APP.partyMasters=Array.isArray(app.partyMasters)?app.partyMasters.map(normalizePartyMaster):APP.partyMasters;
-    APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); });
-    if(Array.isArray(parsed.drivers) && parsed.drivers.length){
-      DRIVERS=parsed.drivers.filter(function(x){ return x && x.name; }).map(function(x){ return {id:String(x.id), name:x.name}; });
-    }
-    return true;
-  }catch(err){ return false; }
-}
+function loadPendingSync(){ return {}; }
+function savePendingSync(){}
+function pendingTable(table){ return {}; }
+function markPendingUpsert(){}
+function markPendingDelete(){}
+function clearPendingSync(){}
+function applyPendingSync(table, list){ return list||[]; }
+function saveAppCache(){ /* pure cloud – no local cache */ }
+function loadAppCache(){ /* pure cloud – no local cache */ return false; }
 function scheduleUIRefresh(){
   clearTimeout(UI_REFRESH_TIMER);
   UI_REFRESH_TIMER=setTimeout(function(){
@@ -2124,8 +2147,6 @@ function scheduleAutoSync(){
   OPTIONAL_SYNC_TIMER=setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 65000);
 }
 
-PENDING_SYNC=loadPendingSync();
-loadCashLocal();
 loadDocSeries();
 
 var BILL_FROM_COMPANY='BGSG PACKAGING SOLUTIONS PRIVATE LIMITED';
@@ -2766,34 +2787,33 @@ function aiAnswer(q){
 
 // ── INIT ──────────────────────────────────────────
 function init(){
-  document.getElementById('ldm').textContent='Opening software…';
-  syncSt('save','Opening…');
-  APP.vehicleDocs=(APP.vehicleDocs&&APP.vehicleDocs.length)?APP.vehicleDocs:loadVehicleDocsLocal();
-  var cacheUsed=loadAppCache();
-  if(cacheUsed){
-    openSoftwareOnce();
-    syncSt('save','Opening cache…');
-  } else {
-    setTimeout(openSoftwareOnce, 420);
-  }
+  document.getElementById('ldm').textContent='Loading data…';
+  syncSt('save','Connecting…');
+  // Safety fallback: open after 7s even if Supabase is slow
+  setTimeout(openSoftwareOnce, 7000);
   syncAllFromSupabase(false,'core');
-  setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 1400);
+  setTimeout(function(){ syncAllFromSupabase(true,'optional'); }, 2000);
 }
 function syncAllFromSupabase(silent, mode){
   mode = mode || 'all';
   if(mode==='all') mode='core';
-  if(LOCAL_WRITE_BUSY>0){
-    setTimeout(function(){ syncAllFromSupabase(silent, mode); }, 1200);
-    return;
-  }
   if(SYNC_BUSY && mode==='core') return;
   var markBusy = mode==='core';
   if(markBusy) SYNC_BUSY=true;
   var coreTasks=[
     {name:'trips', query:'select=id,date,trip_code,transporter,from_loc,to_loc,vehicle,type,invoice,customer,bill_to_consignee,bill_to_gst,driverno,amount,cng,mcd,other,infreight,pl,status,pod,created_at,updated_at&order=date.desc.nullslast,id.desc', apply:function(d){ APP.trips=applyPendingSync('trips',(d||[]).map(normalizeTrip),normalizeTrip).sort(tripSortCompare); }},
-    {name:'expenses', query:'select=id,trip_id,date,type,amount,note&order=date.desc.nullslast,id.desc', apply:function(d){ APP.expenses=(d||[]).map(normalizeExp).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }},
-    {name:'cash_entries', query:'select=id,entry_date,account_name,entry_type,source_party,category,vehicle,particulars,payment_mode,amount,note&order=entry_date.desc.nullslast,id.desc', apply:function(d){ APP.cashEntries=(d||[]).map(normalizeCashEntry).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); }); saveCashLocal(); }, soft:true},
-    {name:'cash_transfers', query:'select=id,transfer_date,from_account,to_account,amount,note&order=transfer_date.desc.nullslast,id.desc', apply:function(d){ APP.cashTransfers=(d||[]).map(normalizeCashTransfer).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); saveCashLocal(); }, soft:true},
+    {name:'expenses', query:'select=id,trip_id,date,type,amount,note&order=date.desc.nullslast,id.desc', apply:function(d){
+      APP.expenses=(d||[]).map(normalizeExp).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
+      // Recompute trip financials from linked expenses so drawer always shows true totals
+      recompAllTripPL();
+    }},
+    {name:'cash_entries', query:'select=id,entry_date,account_name,entry_type,source_party,category,vehicle,particulars,payment_mode,amount,note&order=entry_date.desc.nullslast,id.desc', apply:function(d){
+      APP.cashEntries=(d||[]).map(normalizeCashEntry).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
+      APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); });
+    }, soft:true},
+    {name:'cash_transfers', query:'select=id,transfer_date,from_account,to_account,amount,note&order=transfer_date.desc.nullslast,id.desc', apply:function(d){
+      APP.cashTransfers=(d||[]).map(normalizeCashTransfer).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
+    }, soft:true},
     {name:'drivers', query:'select=id,name&order=name.asc', apply:function(d){ DRIVERS=(d||[]).filter(function(x){return x && x.name;}).map(function(x){return {id:String(x.id),name:x.name};}); }, soft:true},
     {name:'vehicle_documents', query:'select=id,vehicle,record_type,item_name,ref_no,issue_date,expiry_date,last_maintenance_date,next_due_date,alert_days,note&order=expiry_date.asc.nullslast,next_due_date.asc.nullslast,id.desc', apply:function(d){ APP.vehicleDocs=(d||[]).map(normalizeVehicleDoc); saveVehicleDocsLocal(); }, soft:true}
   ];
@@ -2855,7 +2875,7 @@ function gp(name,el){
   document.getElementById('pg-'+name).classList.add('active');
   if(el) el.classList.add('active');
   document.getElementById('ptitle').textContent=pageNames[name]||name;
-  document.getElementById('expbtn').style.display=(name==='expenses'||name==='trips')?'inline-flex':'none';
+  document.getElementById('expbtn').style.display=(name==='expenses')?'inline-flex':'none';
   var mb=document.getElementById('mainbtn');
   var eb=document.getElementById('expbtn');
   if(name==='expenses'){ eb.textContent='+ Expense'; eb.onclick=function(){openExpModal();}; mb.textContent='+ Expense'; mb.onclick=function(){openExpModal();}; }
@@ -3258,7 +3278,7 @@ function clearFundFilters(){
   renderFundTracker();
 }
 
-function syncFundEntryForm(){
+function syncFundEntryForm(preTrip){
   populateFundDropdowns();
   var type=document.getElementById('fund-entry-type').value||'Expense';
   var catSel=document.getElementById('fund-entry-category');
@@ -3266,50 +3286,48 @@ function syncFundEntryForm(){
   var part=document.getElementById('fund-entry-particulars');
   var tripRow=document.getElementById('fund-entry-trip-row');
   if(type==='Receipt'){
-    if(catSel && (!catSel.value || catSel.value!=='Fund Received')) catSel.value='Fund Received';
+    if(catSel && catSel.value!=='Fund Received') catSel.value='Fund Received';
     if(src) src.placeholder='Company / Transporter / Other source';
     if(part) part.placeholder='Fund received for truck expense';
     if(tripRow) tripRow.style.display='none';
   } else {
-    if(catSel && (!catSel.value || catSel.value==='Fund Received')) catSel.value='Fuel';
+    if(catSel && (!catSel.value||catSel.value==='Fund Received')) catSel.value='Fuel';
     if(src) src.placeholder='Vendor / Driver / Transporter';
     if(part) part.placeholder='CNG in 0970 / Fast Tag / Driver Fooding';
     if(tripRow) tripRow.style.display='';
-    populateFundEntryTripDropdown();
+    populateFundEntryTripDropdown(typeof preTrip==='string' ? preTrip : null);
   }
 }
 
-function populateFundEntryTripDropdown(){
+function populateFundEntryTripDropdown(forceValue){
   var sel=document.getElementById('fund-entry-trip'); if(!sel) return;
   var vehicle=(document.getElementById('fund-entry-vehicle').value||'').trim().toUpperCase();
   var date=document.getElementById('fund-entry-date').value||'';
-  var cur=sel.value||'';
+  var keepVal=(typeof forceValue==='string') ? forceValue : sel.value;
   sel.innerHTML='<option value="">-- No trip link --</option>';
-  // Sort trips: matching vehicle first, then by date desc
-  var trips=[].concat(APP.trips||[]);
-  trips.sort(function(a,b){
-    var aMatch=(a.vehicle||'').toUpperCase()===vehicle;
-    var bMatch=(b.vehicle||'').toUpperCase()===vehicle;
-    if(aMatch!==bMatch) return aMatch?-1:1;
+  var trips=[].concat(APP.trips||[]).sort(function(a,b){
+    var am=vehicle&&(a.vehicle||'').toUpperCase()===vehicle;
+    var bm=vehicle&&(b.vehicle||'').toUpperCase()===vehicle;
+    if(am!==bm) return am?-1:1;
     return String(b.date||'').localeCompare(String(a.date||''));
   });
   trips.forEach(function(t){
     var o=document.createElement('option');
     o.value=t.id;
-    var vMatch=(t.vehicle||'').toUpperCase()===vehicle && vehicle;
-    o.textContent=(vMatch?'★ ':'')+(t.invoice||t.tripCode||t.id)+' | '+(t.vehicle||'')+' | '+(t.from||'')+' → '+(t.to||'')+' | '+fmtDate(t.date);
+    var star=vehicle&&(t.vehicle||'').toUpperCase()===vehicle?'\u2605 ':'';
+    o.textContent=star+(t.invoice||t.tripCode||t.id)+' | '+(t.vehicle||'')+' | '+(t.from||'')+' \u2192 '+(t.to||'')+' | '+fmtDate(t.date);
     sel.appendChild(o);
   });
-  // Auto-select: best match = same vehicle + date closest to entry date
-  if(!cur && vehicle){
-    var best=null, bestDiff=Infinity;
+  if(keepVal){ sel.value=keepVal; if(sel.value) { updateFundEntryTripHint(); return; } }
+  if(vehicle){
+    var best=null,bestDiff=Infinity;
     (APP.trips||[]).forEach(function(t){
       if((t.vehicle||'').toUpperCase()!==vehicle) return;
-      var diff=Math.abs(new Date(t.date||0)-new Date(date||0));
-      if(diff<bestDiff){ bestDiff=diff; best=t; }
+      var diff=Math.abs(new Date(t.date||0)-new Date(date||Date.now()));
+      if(diff<bestDiff){bestDiff=diff;best=t;}
     });
-    if(best){ sel.value=best.id; }
-  } else if(cur){ sel.value=cur; }
+    if(best) sel.value=best.id;
+  }
   updateFundEntryTripHint();
 }
 
@@ -3317,29 +3335,18 @@ function updateFundEntryTripHint(){
   var hint=document.getElementById('fund-entry-trip-hint'); if(!hint) return;
   var tid=(document.getElementById('fund-entry-trip')||{}).value||'';
   var cat=(document.getElementById('fund-entry-category')||{}).value||'';
-  if(!tid){ hint.style.display='none'; return; }
-  var trip=getTripById(tid); if(!trip){ hint.style.display='none'; return; }
-  var expType=cashCategoryToExpType(cat);
+  if(!tid){hint.style.display='none';return;}
+  var trip=getTripById(tid);
+  if(!trip){hint.style.display='none';return;}
   hint.style.display='block';
-  hint.innerHTML='Will add as <strong style="color:var(--blue)">'+expType+'</strong> expense on trip <strong>'+escHtml(trip.invoice||trip.id)+'</strong> ('+escHtml(trip.vehicle||'')+' · '+escHtml(trip.from||'')+' → '+escHtml(trip.to||'')+')';
+  hint.innerHTML='Will add as <strong style="color:var(--blue)">'+cashCategoryToExpType(cat)+'</strong> on <strong>'+escHtml(trip.invoice||trip.id)+'</strong> \u00b7 '+escHtml(trip.vehicle||'')+' \u00b7 '+escHtml(trip.from||'')+' \u2192 '+escHtml(trip.to||'');
 }
 
-// Maps Fund Tracker category → Trip Expense type
 function cashCategoryToExpType(cat){
-  var map={
-    'Fuel':'CNG / Fuel',
-    'Toll Tax':'MCD / Tax',
-    'Driver Fooding':'Driver Allowance',
-    'Maintenance':'Repair',
-    'Unloading':'Loading / Unloading',
-    'Porter':'Loading / Unloading',
-    'Other':'Other'
-  };
-  return map[cat]||'Other';
+  return({'Fuel':'CNG / Fuel','Toll Tax':'MCD / Tax','Driver Fooding':'Driver Allowance','Maintenance':'Repair','Unloading':'Loading / Unloading','Porter':'Loading / Unloading'}[cat]||'Other');
 }
 
 function refreshFundUI(){
-  saveCashLocal();
   populateFundDropdowns();
   if(curPage==='fundtracker') renderFundTracker();
 }
@@ -3385,6 +3392,7 @@ function openCashEntryModal(id){
   populateFundDropdowns();
   var btn=document.getElementById('fund-entry-savebtn');
   btn.dataset.editId=id||'';
+  var preTrip='';
   if(id){
     var e=(APP.cashEntries||[]).find(function(x){ return String(x.id)===String(id); });
     if(!e){ toast('Entry not found'); return; }
@@ -3398,9 +3406,7 @@ function openCashEntryModal(id){
     document.getElementById('fund-entry-amount').value=e.amount||'';
     document.getElementById('fund-entry-mode').value=e.paymentMode||'Cash';
     document.getElementById('fund-entry-note').value=e.note||'';
-    // pre-select linked trip if exists
-    var tripSel=document.getElementById('fund-entry-trip');
-    if(tripSel) tripSel.dataset.preselect=e.linkedTripId||'';
+    preTrip=e.linkedTripId||'';
   } else {
     document.getElementById('fund-entry-date').value=today();
     document.getElementById('fund-entry-account').value='Pawan';
@@ -3412,15 +3418,14 @@ function openCashEntryModal(id){
     document.getElementById('fund-entry-amount').value='';
     document.getElementById('fund-entry-mode').value='Cash';
     document.getElementById('fund-entry-note').value='';
-    var tripSel2=document.getElementById('fund-entry-trip');
-    if(tripSel2){ tripSel2.innerHTML='<option value="">-- No trip link --</option>'; tripSel2.dataset.preselect=''; }
+    preTrip='';
   }
-  // wire dynamic refresh
+  // wire fields to refresh trip dropdown
   ['fund-entry-vehicle','fund-entry-date','fund-entry-category'].forEach(function(fid){
     var el=document.getElementById(fid); if(!el) return;
-    el.oninput=el.onchange=function(){ populateFundEntryTripDropdown(); updateFundEntryTripHint(); };
+    el.onchange=el.oninput=function(){ populateFundEntryTripDropdown(null); };
   });
-  syncFundEntryForm();
+  syncFundEntryForm(preTrip);
   document.getElementById('mo-fund-entry').classList.add('open');
 }
 
@@ -3449,75 +3454,113 @@ function saveCashEntry(){
   var editId=document.getElementById('fund-entry-savebtn').dataset.editId||'';
   var entryType=document.getElementById('fund-entry-type').value||'Expense';
   var linkedTripId=(document.getElementById('fund-entry-trip')||{}).value||'';
+  var amtRaw=parseFloat(document.getElementById('fund-entry-amount').value);
+  var amt=isNaN(amtRaw)?0:amtRaw;
+
+  if(!document.getElementById('fund-entry-date').value){ toast('Please select date'); return; }
+  if(!amt){ toast('Please enter amount'); return; }
+
+  var cat=(document.getElementById('fund-entry-category').value||'').trim();
+  if(entryType==='Receipt') cat='Fund Received';
+  if(!cat) cat='Other';
+
   var rec={
-    id:editId||('cash'+Date.now()),
-    date:(document.getElementById('fund-entry-date').value||today()),
+    id:editId||('cash_tmp_'+Date.now()),
+    date:document.getElementById('fund-entry-date').value,
     account:(document.getElementById('fund-entry-account').value||'Pawan').trim(),
     entryType:entryType,
     source:(document.getElementById('fund-entry-source').value||'').trim(),
-    category:(document.getElementById('fund-entry-category').value||'').trim(),
+    category:cat,
     vehicle:(document.getElementById('fund-entry-vehicle').value||'').trim().toUpperCase(),
     particulars:(document.getElementById('fund-entry-particulars').value||'').trim(),
     paymentMode:(document.getElementById('fund-entry-mode').value||'Cash').trim(),
-    amount:+document.getElementById('fund-entry-amount').value||0,
+    amount:amt,
     note:(document.getElementById('fund-entry-note').value||'').trim(),
-    linkedTripId:linkedTripId||''
+    linkedTripId:linkedTripId
   };
-  if(!rec.date){ toast('Please select date'); return; }
-  if(!rec.account){ toast('Please select account'); return; }
-  if(!rec.amount){ toast('Please enter amount'); return; }
-  if(!rec.category) rec.category = entryType==='Receipt' ? 'Fund Received' : 'Other';
-  if(entryType==='Receipt' && rec.category!=='Fund Received') rec.category='Fund Received';
+
   if(rec.vehicle) ensureCashVehicle(rec.vehicle);
-  if(editId) APP.cashEntries=APP.cashEntries.map(function(e){ return String(e.id)===String(editId)?normalizeCashEntry(rec):e; });
-  else APP.cashEntries.push(normalizeCashEntry(rec));
+
+  // Optimistically update in-memory list so UI shows it instantly
+  if(editId){
+    APP.cashEntries=APP.cashEntries.map(function(e){ return String(e.id)===String(editId)?rec:e; });
+  } else {
+    APP.cashEntries.unshift(rec);
+  }
+
   closeModal('mo-fund-entry');
   refreshFundUI();
-  // ── Auto-mirror to trip expense ──────────────────────────────────────────
-  var tripExpCreated=false;
-  if(entryType==='Expense' && linkedTripId && rec.amount){
-    var expType=cashCategoryToExpType(rec.category);
-    // Only auto-create on NEW entries (not edits, to avoid duplicates)
-    if(!editId){
-      var exp={
-        id:'exp'+Date.now()+'f',
+
+  // Step 1: Save cash entry to Supabase
+  syncSt('save','Saving\u2026');
+  var finishCashEntry=function(err, res){
+    if(err){
+      // Rollback
+      if(editId) APP.cashEntries=APP.cashEntries.map(function(e){ return String(e.id)===String(editId)?normalizeCashEntry(Object.assign({},rec,{id:editId})):e; });
+      else APP.cashEntries=APP.cashEntries.filter(function(e){ return e.id!==rec.id; });
+      refreshFundUI();
+      syncSt('err','Save failed');
+      toast('Save failed: '+String(err.message||err));
+      return;
+    }
+    // Update to real Supabase ID
+    if(res && res.id){
+      var realId=String(res.id);
+      APP.cashEntries=APP.cashEntries.map(function(e){ return e.id===rec.id?Object.assign({},e,{id:realId}):e; });
+      rec.id=realId;
+    }
+    refreshFundUI();
+
+    // Step 2: Save trip expense + update trip columns directly
+    if(!editId && entryType==='Expense' && linkedTripId && amt){
+      var expType=cashCategoryToExpType(cat);
+      var expRow={
+        id:'exp_tmp_'+Date.now(),
         tripId:linkedTripId,
         date:rec.date,
         type:expType,
-        amount:rec.amount,
-        note:(rec.particulars||rec.note||'Auto from Fund Tracker')
+        amount:amt,
+        note:rec.particulars||rec.note||'From Fund Tracker'
       };
-      APP.expenses.push(exp);
-      recompPL(linkedTripId);
-      renderPage(curPage);
-      updateBadge();
-      tripExpCreated=true;
-      sbInsert('expenses', expToRow(exp), function(err){ if(!err) saveAppCache(); });
-    }
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-  syncSt('save','Saving…');
-  var cb=function(err,row){
-    if(!err && row && row.id){ rec.id=String(row.id); }
-    if(err){ saveCashLocal(); syncSt('save','Local save only'); toast('Saved locally. Create cash_entries table in Supabase for cloud sync.'); }
-    else {
-      saveCashLocal(); saveAppCache(); syncSt('ok','Synced ✓');
-      var msg=editId?'Cash entry updated!':'Cash entry saved!';
-      if(tripExpCreated){
-        var trip=getTripById(linkedTripId);
-        msg+=' ✓ Also added as trip expense'+(trip?' on '+escHtml(trip.invoice||''):'');
+      // Update trip's direct financial columns immediately in-memory
+      var trip=getTripById(linkedTripId);
+      if(trip){
+        if(expType==='CNG / Fuel')      trip.cng=(+trip.cng||0)+amt;
+        else if(expType==='MCD / Tax')  trip.mcd=(+trip.mcd||0)+amt;
+        else if(expType==='InFreight')  trip.infreight=(+trip.infreight||0)+amt;
+        else                            trip.other=(+trip.other||0)+amt;
+        trip.pl=(+trip.amount||0)-(+trip.cng||0)-(+trip.mcd||0)-(+trip.other||0)+(+trip.infreight||0);
+        // Persist trip columns to Supabase
+        sbUpdate('trips', trip.id, {cng:trip.cng, mcd:trip.mcd, other:trip.other, infreight:trip.infreight, pl:trip.pl}, function(){});
+        renderPage(curPage);
       }
-      toast(msg);
+      sbInsert('expenses', expToRow(expRow), function(expErr, expRes){
+        if(expErr){
+          syncSt('err','Expense sync failed');
+          toast('Cash entry saved, but trip expense failed: '+String(expErr.message||expErr));
+          return;
+        }
+        if(expRes && expRes.id) expRow.id=String(expRes.id);
+        APP.expenses.unshift(expRow);
+        updateBadge();
+        var t2=getTripById(linkedTripId);
+        syncSt('ok','Synced ✓');
+        toast('✓ Entry + trip updated'+(t2?' → '+escHtml(t2.invoice||t2.id):''));
+      });
+    } else {
+      syncSt('ok','Synced ✓');
+      toast(editId?'Entry updated!':'Entry saved!');
     }
   };
-  if(editId) sbUpdate('cash_entries', editId, cashEntryToRow(rec), cb);
-  else sbInsert('cash_entries', cashEntryToRow(rec), cb);
+
+  if(editId) sbUpdate('cash_entries', editId, cashEntryToRow(rec), finishCashEntry);
+  else sbInsert('cash_entries', cashEntryToRow(rec), finishCashEntry);
 }
 
 function saveCashTransfer(){
   var editId=document.getElementById('fund-transfer-savebtn').dataset.editId||'';
   var rec={
-    id:editId||('trf'+Date.now()),
+    id:editId||('trf_tmp_'+Date.now()),
     date:(document.getElementById('fund-transfer-date').value||today()),
     fromAccount:(document.getElementById('fund-transfer-from').value||'Pawan').trim(),
     toAccount:(document.getElementById('fund-transfer-to').value||'Karan').trim(),
@@ -3528,14 +3571,19 @@ function saveCashTransfer(){
   if(!rec.amount){ toast('Please enter amount'); return; }
   if(rec.fromAccount===rec.toAccount){ toast('From and To account cannot be same'); return; }
   if(editId) APP.cashTransfers=APP.cashTransfers.map(function(t){ return String(t.id)===String(editId)?normalizeCashTransfer(rec):t; });
-  else APP.cashTransfers.push(normalizeCashTransfer(rec));
+  else APP.cashTransfers.unshift(normalizeCashTransfer(rec));
   closeModal('mo-fund-transfer');
   refreshFundUI();
-  syncSt('save','Saving…');
+  syncSt('save','Saving\u2026');
   var cb=function(err,row){
-    if(!err && row && row.id){ rec.id=String(row.id); }
-    if(err){ saveCashLocal(); syncSt('save','Local save only'); toast('Transfer saved locally. Create cash_transfers table in Supabase for cloud sync.'); }
-    else { saveCashLocal(); saveAppCache(); syncSt('ok','Synced ✓'); toast(editId?'Transfer updated!':'Transfer saved!'); }
+    if(err){
+      APP.cashTransfers=APP.cashTransfers.filter(function(t){ return t.id!==rec.id; });
+      refreshFundUI();
+      syncSt('err','Save failed'); toast('Transfer save failed: '+String(err.message||err)); return;
+    }
+    if(row && row.id){ APP.cashTransfers=APP.cashTransfers.map(function(t){ return t.id===rec.id?Object.assign({},t,{id:String(row.id)}):t; }); }
+    syncSt('ok','Synced \u2713'); toast(editId?'Transfer updated!':'Transfer saved!');
+    refreshFundUI();
   };
   if(editId) sbUpdate('cash_transfers', editId, cashTransferToRow(rec), cb);
   else sbInsert('cash_transfers', cashTransferToRow(rec), cb);
@@ -3543,23 +3591,25 @@ function saveCashTransfer(){
 
 function deleteCashEntry(id){
   if(!confirm('Delete this cash entry?')) return;
+  var backup=APP.cashEntries.slice();
   APP.cashEntries=APP.cashEntries.filter(function(e){ return String(e.id)!==String(id); });
   refreshFundUI();
-  syncSt('save','Saving…');
+  syncSt('save','Deleting\u2026');
   sbDelete('cash_entries', id, function(err){
-    if(err){ saveCashLocal(); syncSt('save','Local save only'); toast('Entry deleted locally. Cloud table not ready.'); }
-    else { saveAppCache(); syncSt('ok','Synced ✓'); toast('Cash entry deleted.'); }
+    if(err){ APP.cashEntries=backup; refreshFundUI(); syncSt('err','Delete failed'); toast('Delete failed: '+String(err.message||err)); return; }
+    syncSt('ok','Synced \u2713'); toast('Cash entry deleted.');
   });
 }
 
 function deleteCashTransfer(id){
   if(!confirm('Delete this transfer?')) return;
+  var backup=APP.cashTransfers.slice();
   APP.cashTransfers=APP.cashTransfers.filter(function(t){ return String(t.id)!==String(id); });
   refreshFundUI();
-  syncSt('save','Saving…');
+  syncSt('save','Deleting\u2026');
   sbDelete('cash_transfers', id, function(err){
-    if(err){ saveCashLocal(); syncSt('save','Local save only'); toast('Transfer deleted locally. Cloud table not ready.'); }
-    else { saveAppCache(); syncSt('ok','Synced ✓'); toast('Transfer deleted.'); }
+    if(err){ APP.cashTransfers=backup; refreshFundUI(); syncSt('err','Delete failed'); toast('Delete failed: '+String(err.message||err)); return; }
+    syncSt('ok','Synced \u2713'); toast('Transfer deleted.');
   });
 }
 
@@ -3978,9 +4028,8 @@ function saveAgentFreight(){
   markPendingUpsert('agent_freights', rec.id, rec);
   saveAppCache();
   closeModal('mo-af'); renderAgentFreight(); updateAFBadge();
-  syncSt('save','Saving…'); beginLocalWrite();
+  syncSt('save','Saving…');
   sbUpsert('agent_freights', afToRow(rec), function(err,row){
-    endLocalWrite();
     if(!err && row && row.id){ rec.id=String(row.id); clearPendingSync('agent_freights', rec.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editId?'Entry updated!':'Agent freight saved! Net: '+fmt(adv+balRcvd)); }
     else { syncSt('err','Sync error'); toast('Saved locally. Agent Freight cloud save failed, will retry when you save/sync again.'); }
   });
@@ -3992,9 +4041,8 @@ function deleteAgentFreight(id){
   delete AF_STATE.selected[String(id)];
   markPendingDelete('agent_freights', id);
   saveAppCache();
-  renderAgentFreight(); updateAFBadge(); syncSt('save','Deleting…'); beginLocalWrite();
+  renderAgentFreight(); updateAFBadge(); syncSt('save','Deleting…');
   sbDeleteStrict('agent_freights', id, function(err){
-    endLocalWrite();
     if(err){ syncSt('err','Delete sync error'); toast('Deleted locally. Cloud delete failed, so it is hidden here until delete sync succeeds.'); }
     else { clearPendingSync('agent_freights', id); saveAppCache(); syncSt('ok','Synced ✓'); toast('Deleted.'); }
   });
@@ -4182,9 +4230,8 @@ function saveTrip(){
   markPendingUpsert('trips', trip.id, trip);
   saveAppCache();
   closeModal('mo-trip'); renderPage(curPage); populateMonthDropdowns(); populateTripFilters(); populateConsigneeDatalists(); refreshVehicleDocUI(); populateFundDropdowns();
-  syncSt('save','Saving…'); beginLocalWrite();
+  syncSt('save','Saving…');
   var done=function(err,row){
-    endLocalWrite();
     btn.disabled=false; btn.textContent='Save Trip';
     if(!err && row && row.id){ trip.id=String(row.id); clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
     else if(!err){ clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
@@ -4210,9 +4257,8 @@ function deleteTrip(tid){
   APP.expenses=APP.expenses.filter(function(e){return String(e.tripId)!==String(tid);});
   markPendingDelete('trips', tid);
   saveAppCache();
-  renderPage(curPage); updateBadge(); refreshVehicleDocUI(); populateFundDropdowns(); syncSt('save','Deleting…'); beginLocalWrite();
+  renderPage(curPage); updateBadge(); refreshVehicleDocUI(); populateFundDropdowns(); syncSt('save','Deleting…');
   sbDeleteStrict('trips', tid, function(err){
-    endLocalWrite();
     if(err){ syncSt('err','Delete sync error'); toast('Deleted locally. Cloud delete failed, so it is hidden here until delete sync succeeds.'); }
     else { clearPendingSync('trips', tid); saveAppCache(); syncSt('ok','Synced ✓'); toast('Trip deleted.'); }
   });
@@ -4991,16 +5037,40 @@ function openTripDrawer(tripId) {
     kvi('Type', tripPill(t.type)) +
     kvi('Customer', escHtml(t.customer||'-'));
 
-  // Financials
-  var pl = +t.pl||0;
-  var plColor = pl>0?'var(--green)':pl<0?'var(--red)':'var(--muted)';
+  // Financials — sum from expenses table + linked cash entries (covers entries saved before fix)
+  var dispCNG=0,dispMCD=0,dispOther=0,dispInf=0;
+  // From expenses table
+  (APP.expenses||[]).filter(function(e){ return String(e.tripId||'')===String(tripId); }).forEach(function(e){
+    var a=+e.amount||0;
+    if(e.type==='CNG / Fuel') dispCNG+=a;
+    else if(e.type==='MCD / Tax') dispMCD+=a;
+    else if(e.type==='InFreight') dispInf+=a;
+    else dispOther+=a;
+  });
+  // From cash_entries with linkedTripId (catches entries not yet in expenses table)
+  // Only add if no expenses exist for this trip yet (avoids double-counting after fix)
+  var hasExpenses=(APP.expenses||[]).some(function(e){ return String(e.tripId||'')===String(tripId); });
+  if(!hasExpenses){
+    (APP.cashEntries||[]).filter(function(e){ return e.entryType==='Expense' && String(e.linkedTripId||'')===String(tripId); }).forEach(function(e){
+      var a=+e.amount||0;
+      var et=cashCategoryToExpType(e.category||'');
+      if(et==='CNG / Fuel') dispCNG+=a;
+      else if(et==='MCD / Tax') dispMCD+=a;
+      else if(et==='InFreight') dispInf+=a;
+      else dispOther+=a;
+    });
+  }
+  // Final fallback: use trip columns if both sources empty
+  if(!dispCNG&&!dispMCD&&!dispOther&&!dispInf){ dispCNG=+t.cng||0; dispMCD=+t.mcd||0; dispOther=+t.other||0; dispInf=+t.infreight||0; }
+  var dispPL=(+t.amount||0)-dispCNG-dispMCD-dispOther+dispInf;
+  var plColor=dispPL>0?'var(--green)':dispPL<0?'var(--red)':'var(--muted)';
   document.getElementById('drawer-financials').innerHTML =
     '<div class="drawer-fin-card"><div class="drawer-fin-label">Amount</div><div class="drawer-fin-value">'+fmt(t.amount||0)+'</div></div>' +
-    '<div class="drawer-fin-card"><div class="drawer-fin-label">In-Freight</div><div class="drawer-fin-value" style="color:var(--green)">'+fmt(t.infreight||0)+'</div></div>' +
-    '<div class="drawer-fin-card"><div class="drawer-fin-label">P&amp;L</div><div class="drawer-fin-value" style="color:'+plColor+'">'+fmt(pl)+'</div></div>' +
-    '<div class="drawer-fin-card"><div class="drawer-fin-label">CNG</div><div class="drawer-fin-value" style="color:var(--orange)">'+fmt(t.cng||0)+'</div></div>' +
-    '<div class="drawer-fin-card"><div class="drawer-fin-label">MCD</div><div class="drawer-fin-value">'+fmt(t.mcd||0)+'</div></div>' +
-    '<div class="drawer-fin-card"><div class="drawer-fin-label">Other Exp</div><div class="drawer-fin-value">'+fmt(t.other||0)+'</div></div>';
+    '<div class="drawer-fin-card"><div class="drawer-fin-label">In-Freight</div><div class="drawer-fin-value" style="color:var(--green)">'+fmt(dispInf)+'</div></div>' +
+    '<div class="drawer-fin-card"><div class="drawer-fin-label">P&amp;L</div><div class="drawer-fin-value" style="color:'+plColor+'">'+fmt(dispPL)+'</div></div>' +
+    '<div class="drawer-fin-card"><div class="drawer-fin-label">CNG</div><div class="drawer-fin-value" style="color:var(--orange)">'+fmt(dispCNG)+'</div></div>' +
+    '<div class="drawer-fin-card"><div class="drawer-fin-label">MCD</div><div class="drawer-fin-value">'+fmt(dispMCD)+'</div></div>' +
+    '<div class="drawer-fin-card"><div class="drawer-fin-label">Other Exp</div><div class="drawer-fin-value">'+fmt(dispOther)+'</div></div>';
 
   // Status
   var st = t.status||'To Be Planned';
