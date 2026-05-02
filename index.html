@@ -1740,7 +1740,7 @@ function recompAllTripPL(){
     }
   });
 }
-function updateBadge(){ var b=document.getElementById('expbadge'),n=APP.expenses.length; b.style.display=n>0?'inline-block':'none'; b.textContent=n; }
+function updateBadge(){ var b=document.getElementById('expbadge'),n=APP.expenses.length; if(!b) return; b.style.display=n>0?'inline-block':'none'; b.textContent=n; }
 function totalSalForMonth(m){ var k=String(m).slice(0,7); return APP.salaries.filter(function(s){return normalizeMonthVal(s.month)===k;}).reduce(function(a,x){return a+(+x.amount||0);},0); }
 function totalVehExpForMonth(m){ var k=String(m).slice(0,7); return APP.vehicleExpenses.filter(function(v){return normalizeMonthVal(v.month)===k;}).reduce(function(a,x){return a+(+x.amount||0);},0); }
 function updateDriverSelect(){
@@ -3048,7 +3048,8 @@ function filterByStatus(status){
 
 // ── EXPENSES ──────────────────────────────────────
 function renderExpenses(q){
-  q=q||''; var tf=document.getElementById('exptf').value||'';
+  if(!document.getElementById('expmetrics')) return;
+  q=q||''; var tf=(document.getElementById('exptf')||{value:''}).value||'';
   var data=APP.expenses.filter(function(e){ if(tf&&e.type!==tf) return false; if(q){ var trip=APP.trips.find(function(t){return String(t.id)===String(e.tripId);}); if([e.type,e.note,trip?trip.invoice:'',trip?trip.customer:''].join(' ').toLowerCase().indexOf(q.toLowerCase())<0) return false; } return true; }).sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
   var byType={}; APP.expenses.forEach(function(e){byType[e.type]=(byType[e.type]||0)+(+e.amount||0);});
   var total=APP.expenses.reduce(function(s,e){return s+(+e.amount||0);},0);
