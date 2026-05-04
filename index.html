@@ -472,6 +472,40 @@ tr:hover td{background:#f8fafc}
   #trip-drawer{width:100%;right:-100%}
 }
 
+
+/* ── Fund Tracker Efficiency Upgrade ───────────────────────────────────── */
+.fund-metrics-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:10px;margin-bottom:12px!important}
+.fund-filter-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(15,33,55,.04)}
+.fund-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.fund-filter-title{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fund-filter-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.fund-filter-grid{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(6,minmax(120px,1fr));gap:10px;align-items:end}
+.fund-filter-grid .sbox,.fund-filter-grid .flt{width:100%;height:34px;font-size:12px}
+.fund-filter-label{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.fund-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.fund-account-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(15,33,55,.04)}
+.fund-account-card:before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--blue)}
+.fund-account-card.karan:before{background:var(--purple)}
+.fund-account-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+.fund-account-name{font-family:var(--fd);font-size:19px;font-weight:800;color:var(--navy);line-height:1}
+.fund-account-bal{font-family:var(--fd);font-size:24px;font-weight:800;line-height:1;text-align:right}
+.fund-mini-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.fund-mini{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 9px;min-width:0}
+.fund-mini-lbl{font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fund-mini-val{font-family:var(--fd);font-size:16px;font-weight:800;color:var(--navy);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fund-transfer-card{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:14px;overflow:hidden;box-shadow:0 1px 3px rgba(15,33,55,.04)}
+.fund-transfer-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
+.fund-transfer-list{max-height:160px;overflow:auto}
+.fund-transfer-row{display:grid;grid-template-columns:88px 1fr 100px 1.2fr 104px;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:12px}
+.fund-transfer-row:last-child{border-bottom:none}
+.fund-transfer-route{font-weight:800;color:var(--navy)}
+.fund-transfer-amt{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--blue);text-align:right}
+.fund-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+#fund-entries-wrap{max-height:calc(100vh - 360px)}
+@media (max-width:1280px){.fund-metrics-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.fund-filter-grid{grid-template-columns:repeat(3,minmax(150px,1fr))}.fund-mini-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.fund-account-grid{grid-template-columns:1fr}.fund-transfer-row{grid-template-columns:80px 1fr 90px}.fund-transfer-row .fund-transfer-note,.fund-transfer-row .fund-transfer-actions{display:none}}
+@media (max-width:760px){.fund-metrics-grid,.fund-filter-grid{grid-template-columns:1fr!important}.fund-filter-actions{width:100%;justify-content:stretch}.fund-filter-actions .btn{flex:1;justify-content:center}.fund-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
 </style>
 </head>
 <body>
@@ -683,28 +717,36 @@ tr:hover td{background:#f8fafc}
 
     <!-- FUND TRACKER -->
     <div id="pg-fundtracker" class="pg">
-      <div class="mgrid" id="fund-metrics" style="grid-template-columns:repeat(5,1fr)"></div>
-      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:14px">
-        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Cashbook Filters</div>
-        <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr 1fr 1fr 110px;gap:10px">
-          <div><input class="sbox" id="fund-search" placeholder="Search particulars, source, note…" oninput="renderFundTracker()"></div>
-          <div><input class="flt" style="width:100%" type="date" id="fund-date-from" onchange="renderFundTracker()"></div>
-          <div><input class="flt" style="width:100%" type="date" id="fund-date-to" onchange="renderFundTracker()"></div>
-          <div><select class="flt" style="width:100%" id="fund-account" onchange="renderFundTracker()"><option value="">All Accounts</option><option>Pawan</option><option>Karan</option></select></div>
-          <div><select class="flt" style="width:100%" id="fund-type" onchange="renderFundTracker()"><option value="">All Types</option><option>Receipt</option><option>Expense</option></select></div>
-          <div><select class="flt" style="width:100%" id="fund-category" onchange="renderFundTracker()"><option value="">All Categories</option></select></div>
-          <div style="display:flex;gap:8px"><select class="flt" style="width:100%" id="fund-vehicle" onchange="renderFundTracker()"><option value="">All Vehicles</option></select></div>
+      <div class="fund-filter-card">
+        <div class="fund-filter-head">
+          <div>
+            <div class="fund-filter-title">Cashbook Control Center</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">Two-account ledger for Pawan and Karan with date-wise Excel export.</div>
+          </div>
+          <div class="fund-filter-actions">
+            <button class="btn btns btnp" onclick="openCashEntryModal()">+ Cash Entry</button>
+            <button class="btn btns btno" onclick="openCashTransferModal()">↔ Transfer</button>
+            <button class="btn btns" style="background:var(--lgreen);color:var(--green);border-color:#86efac" onclick="exportFundExcel()">⬇ Export Excel</button>
+            <button class="btn btns" style="background:var(--lred);color:var(--red);border-color:#fca5a5" onclick="clearFundFilters()">✕ Clear</button>
+          </div>
         </div>
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
-          <button class="btn btns" style="background:var(--lred);color:var(--red);border-color:#fca5a5" onclick="clearFundFilters()">✕ Clear</button>
+        <div class="fund-filter-grid">
+          <div><div class="fund-filter-label">Search</div><input class="sbox" id="fund-search" placeholder="Search account, vehicle, category, note…" oninput="renderFundTracker()"></div>
+          <div><div class="fund-filter-label">From Date</div><input class="flt" type="date" id="fund-date-from" onchange="renderFundTracker()"></div>
+          <div><div class="fund-filter-label">To Date</div><input class="flt" type="date" id="fund-date-to" onchange="renderFundTracker()"></div>
+          <div><div class="fund-filter-label">Account</div><select class="flt" id="fund-account" onchange="renderFundTracker()"><option value="">All Accounts</option><option>Pawan</option><option>Karan</option></select></div>
+          <div><div class="fund-filter-label">Type</div><select class="flt" id="fund-type" onchange="renderFundTracker()"><option value="">All Types</option><option>Receipt</option><option>Expense</option></select></div>
+          <div><div class="fund-filter-label">Category</div><select class="flt" id="fund-category" onchange="renderFundTracker()"><option value="">All Categories</option></select></div>
+          <div><div class="fund-filter-label">Vehicle</div><select class="flt" id="fund-vehicle" onchange="renderFundTracker()"><option value="">All Vehicles</option></select></div>
         </div>
       </div>
+      <div class="mgrid fund-metrics-grid" id="fund-metrics"></div>
       <div id="fund-summary" style="margin-bottom:10px;font-size:13px;color:var(--muted)"></div>
 
-      <!-- VEHICLE + CATEGORY SUMMARY REDESIGN -->
+      <!-- VEHICLE + CATEGORY SUMMARY -->
       <div id="fund-analytics" style="margin-bottom:16px"></div>
       <div class="card" id="fund-entries-card" style="padding:0;overflow:hidden;display:flex;flex-direction:column">
-        <div class="cardh"><span class="cardt">All Cashbook Entries</span></div>
+        <div class="cardh"><span class="cardt" id="fund-table-title">Cashbook Entries</span><button class="btn btns" style="background:var(--lgreen);color:var(--green);border-color:#86efac" onclick="exportFundExcel()">⬇ Export Excel</button></div>
         <div id="fund-entries-wrap">
           <table id="fund-entries-table">
             <thead><tr>
@@ -3290,29 +3332,97 @@ function totalVehExpForMonth(m){ var key=normalizeMonthVal(m); return APP.vehicl
 
 
 // ── FUND TRACKER ──────────────────────────────────
+function fundFilteredTransfers(){
+  var q=(document.getElementById('fund-search')||{}).value||'';
+  var d1=(document.getElementById('fund-date-from')||{}).value||'';
+  var d2=(document.getElementById('fund-date-to')||{}).value||'';
+  var ac=(document.getElementById('fund-account')||{}).value||'';
+  return (APP.cashTransfers||[]).filter(function(t){
+    var d=String(t.date||'').slice(0,10);
+    if(d1 && d<d1) return false;
+    if(d2 && d>d2) return false;
+    if(ac && t.fromAccount!==ac && t.toAccount!==ac) return false;
+    if(q && [t.fromAccount,t.toAccount,t.note].join(' ').toLowerCase().indexOf(q.toLowerCase())<0) return false;
+    return true;
+  }).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
+}
+
+function fundDateRangeLabel(){
+  var d1=(document.getElementById('fund-date-from')||{}).value||'';
+  var d2=(document.getElementById('fund-date-to')||{}).value||'';
+  if(d1 && d2) return fmtDate(d1)+' to '+fmtDate(d2);
+  if(d1) return 'From '+fmtDate(d1);
+  if(d2) return 'Up to '+fmtDate(d2);
+  return 'All Dates';
+}
+
+function fundAccountStats(account, entries, transfers){
+  entries=entries||[]; transfers=transfers||[];
+  var receipts=entries.filter(function(e){return e.account===account && e.entryType==='Receipt';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+  var expenses=entries.filter(function(e){return e.account===account && e.entryType==='Expense';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+  var tin=transfers.filter(function(t){return t.toAccount===account;}).reduce(function(s,t){return s+(+t.amount||0);},0);
+  var tout=transfers.filter(function(t){return t.fromAccount===account;}).reduce(function(s,t){return s+(+t.amount||0);},0);
+  return {account:account, receipts:receipts, expenses:expenses, transferIn:tin, transferOut:tout, selectedNet:receipts-expenses+tin-tout, liveBalance:cashBalance(account)};
+}
+
+function fundMetric(label, value, color, sub, icon, click){
+  return '<div class="mcard" '+(click?'onclick="'+click+'"':'')+' style="border-top:3px solid '+color+';position:relative;overflow:hidden;'+(click?'cursor:pointer;':'')+'">'
+    +'<div style="position:absolute;top:8px;right:10px;font-size:22px;opacity:.95">'+(icon||'')+'</div>'
+    +'<div class="mlbl">'+label+'</div><div class="mval" style="color:'+color+'">'+fmt(value)+'</div>'
+    +(sub?'<div class="msub" style="margin-top:6px">'+sub+'</div>':'')+'</div>';
+}
+
+function fundMini(label, value, color){
+  return '<div class="fund-mini"><div class="fund-mini-lbl">'+label+'</div><div class="fund-mini-val" style="color:'+color+'">'+fmt(value)+'</div></div>';
+}
+
+function fundAccountCard(st, cls){
+  var balCol=st.liveBalance>=0?'var(--green)':'var(--red)';
+  var netCol=st.selectedNet>=0?'var(--green)':'var(--red)';
+  return '<div class="fund-account-card '+(cls||'')+'">'
+    +'<div class="fund-account-top"><div><div class="fund-account-name">'+st.account+' Account</div><div style="font-size:12px;color:var(--muted);margin-top:4px">Selected period movement + live balance</div></div><div><div class="fund-account-bal" style="color:'+balCol+'">'+fmt(st.liveBalance)+'</div><div style="font-size:11px;color:var(--muted);text-align:right;margin-top:3px">Current balance</div></div></div>'
+    +'<div class="fund-mini-grid">'
+      +fundMini('Receipts',st.receipts,'var(--green)')
+      +fundMini('Expenses',st.expenses,'var(--red)')
+      +fundMini('Transfer In',st.transferIn,'var(--blue)')
+      +fundMini('Transfer Out',st.transferOut,'var(--orange)')
+      +fundMini('Net Move',st.selectedNet,netCol)
+    +'</div>'
+    +'<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn btns" onclick="filterFundByAccount(\''+st.account+'\')">View Ledger</button><button class="btn btns btnp" onclick="openCashEntryModal()">+ Entry</button><button class="btn btns btno" onclick="openCashTransferModal()">Transfer</button></div>'
+  +'</div>';
+}
+
 function renderFundTracker(){
   populateFundDropdowns();
   var all=(APP.cashEntries||[]).slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
   var data=fundFilteredEntries();
-  var totalReceipts=cashTotal('Receipt');
-  var totalExpenses=cashTotal('Expense');
+  var transferData=fundFilteredTransfers();
+  var selectedReceipts=data.filter(function(e){return e.entryType==='Receipt';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+  var selectedExpenses=data.filter(function(e){return e.entryType==='Expense';}).reduce(function(s,e){return s+(+e.amount||0);},0);
+  var selectedTransferIn=transferData.reduce(function(s,t){return s+(+t.amount||0);},0);
+  var selectedNet=selectedReceipts-selectedExpenses;
   var pBal=cashBalance('Pawan');
   var kBal=cashBalance('Karan');
   var combinedBal=pBal+kBal;
   var balanceMap=getCashEntryBalanceMap();
 
-  var utilRate=totalReceipts>0?Math.round(totalExpenses/totalReceipts*100):0;
   document.getElementById('fund-metrics').innerHTML=
-    '<div class="mcard" style="border-top:3px solid var(--green);position:relative;overflow:hidden"><div style="position:absolute;top:8px;right:10px;font-size:24px;opacity:1">💰</div><div class="mlbl">Total Receipts</div><div class="mval" style="color:var(--green)">'+fmt(totalReceipts)+'</div><div style="height:3px;background:#f1f5f9;border-radius:2px;margin-top:8px"><div style="height:3px;background:var(--green);border-radius:2px;width:100%"></div></div><div class="msub" style="margin-top:3px">All inflows</div></div>'
-    +'<div class="mcard" style="border-top:3px solid var(--red);position:relative;overflow:hidden"><div style="position:absolute;top:8px;right:10px;font-size:24px;opacity:1">💸</div><div class="mlbl">Total Expenses</div><div class="mval" style="color:var(--red)">'+fmt(totalExpenses)+'</div><div style="height:3px;background:#f1f5f9;border-radius:2px;margin-top:8px"><div style="height:3px;background:var(--red);border-radius:2px;width:'+Math.min(utilRate,100)+'%"></div></div><div class="msub" style="margin-top:3px">'+utilRate+'% of receipts spent</div></div>'
-    +'<div class="mcard" style="border-top:3px solid '+(combinedBal>=0?'var(--green)':'var(--red)')+';position:relative;overflow:hidden"><div style="position:absolute;top:8px;right:10px;font-size:24px;opacity:1">🏦</div><div class="mlbl">Net Balance</div><div class="mval" style="color:'+(combinedBal>=0?'var(--green)':'var(--red)')+'">'+fmt(combinedBal)+'</div><div style="display:flex;gap:6px;margin-top:8px"><span style="background:'+(pBal>=0?'#dcfce7':'#fef2f2')+';color:'+(pBal>=0?'var(--green)':'var(--red)')+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">P: '+fmt(pBal)+'</span><span style="background:'+(kBal>=0?'#dcfce7':'#fef2f2')+';color:'+(kBal>=0?'var(--green)':'var(--red)')+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">K: '+fmt(kBal)+'</span></div></div>'
-    +'<div class="mcard" style="border-top:3px solid var(--blue);cursor:pointer;position:relative;overflow:hidden" onclick="filterFundByAccount(\'Pawan\')"><div style="position:absolute;top:8px;right:10px;font-size:24px;opacity:1">👤</div><div class="mlbl">Pawan Balance</div><div class="mval" style="color:'+(pBal>=0?'var(--green)':'var(--red)')+'">'+fmt(pBal)+'</div><div class="msub" style="margin-top:6px">'+(pBal>=0?'✅ Sufficient':'⚠️ Overspent')+' · Click to filter</div></div>'
-    +'<div class="mcard" style="border-top:3px solid var(--purple);cursor:pointer;position:relative;overflow:hidden" onclick="filterFundByAccount(\'Karan\')"><div style="position:absolute;top:8px;right:10px;font-size:24px;opacity:1">👤</div><div class="mlbl">Karan Balance</div><div class="mval" style="color:'+(kBal>=0?'var(--green)':'var(--red)')+'">'+fmt(kBal)+'</div><div class="msub" style="margin-top:6px">'+(kBal>=0?'✅ Sufficient':'⚠️ Overspent')+' · Click to filter</div></div>';
+    fundMetric('Selected Receipts',selectedReceipts,'var(--green)',fundDateRangeLabel(),'💰','')+
+    fundMetric('Selected Expenses',selectedExpenses,'var(--red)',data.length+' cashbook entries','💸','')+
+    fundMetric('Selected Net',selectedNet,selectedNet>=0?'var(--green)':'var(--red)','Receipts - expenses','📈','')+
+    fundMetric('Pawan Live Balance',pBal,pBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Pawan\')')+
+    fundMetric('Karan Live Balance',kBal,kBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Karan\')')+
+    fundMetric('Combined Balance',combinedBal,combinedBal>=0?'var(--green)':'var(--red)','Pawan + Karan','🏦','');
 
   var activeAccount=(document.getElementById('fund-account')||{}).value||'';
-  var summary='Showing <strong>'+data.length+'</strong> of <strong>'+all.length+'</strong> entries';
-  if(activeAccount) summary+=' &nbsp;|&nbsp; <strong>'+activeAccount+'</strong> ledger view';
+  var activeVehicle=(document.getElementById('fund-vehicle')||{}).value||'';
+  var summary='Showing <strong>'+data.length+'</strong> of <strong>'+all.length+'</strong> cash entries';
+  summary+=' &nbsp;|&nbsp; Date Range: <strong>'+fundDateRangeLabel()+'</strong>';
+  if(activeAccount) summary+=' &nbsp;|&nbsp; Account: <strong>'+activeAccount+'</strong>';
+  if(activeVehicle) summary+=' &nbsp;|&nbsp; Vehicle: <strong>'+activeVehicle+'</strong>';
   document.getElementById('fund-summary').innerHTML=summary;
+  var tableTitle=document.getElementById('fund-table-title');
+  if(tableTitle) tableTitle.textContent='Cashbook Entries — '+fundDateRangeLabel();
 
   document.getElementById('fund-body').innerHTML=data.length===0
     ? '<tr><td colspan="12" style="text-align:center;color:var(--muted);padding:28px">No cash entries found for this filter.</td></tr>'
@@ -3324,14 +3434,14 @@ function renderFundTracker(){
         var balCls=runBal>=0?'tpro':'tlos';
         return '<tr>'
           +'<td>'+fmtDate(e.date)+'</td>'
-          +'<td><strong>'+e.account+'</strong></td>'
-          +'<td><span style="background:'+typeBg+';color:'+typeCol+';font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">'+e.entryType+'</span></td>'
-          +'<td>'+(e.source||'-')+'</td>'
-          +'<td>'+(e.category||'-')+'</td>'
-          +'<td class="tmon">'+(e.vehicle||'-')+'</td>'
-          +'<td style="text-align:left">'+(e.particulars||'-')+'</td>'
-          +'<td>'+(e.paymentMode||'-')+'</td>'
-          +'<td>'+(e.note||'-')+'</td>'
+          +'<td><strong>'+escHtml(e.account)+'</strong></td>'
+          +'<td><span style="background:'+typeBg+';color:'+typeCol+';font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px">'+escHtml(e.entryType)+'</span></td>'
+          +'<td>'+escHtml(e.source||'-')+'</td>'
+          +'<td>'+escHtml(e.category||'-')+'</td>'
+          +'<td class="tmon">'+escHtml(e.vehicle||'-')+'</td>'
+          +'<td style="text-align:left">'+escHtml(e.particulars||'-')+'</td>'
+          +'<td>'+escHtml(e.paymentMode||'-')+'</td>'
+          +'<td>'+escHtml(e.note||'-')+'</td>'
           +'<td class="'+typeCls+'">'+fmt(e.amount)+'</td>'
           +'<td class="'+balCls+'">'+fmt(runBal)+'</td>'
           +'<td><div class="acts"><button class="btn btns btno" onclick="openCashEntryModal(\''+e.id+'\')">Edit</button><button class="btn btns btnd" onclick="deleteCashEntry(\''+e.id+'\')">Del</button></div></td>'
@@ -3339,7 +3449,6 @@ function renderFundTracker(){
       }).join('');
 
   var expEntries=data.filter(function(e){ return e.entryType==='Expense'; });
-  var recEntries=data.filter(function(e){ return e.entryType==='Receipt'; });
 
   // ── Per-vehicle stats ──────────────────────────────────────────────────────
   var vehData=CASH_VEHICLES.map(function(v){
@@ -3360,7 +3469,6 @@ function renderFundTracker(){
   var catRows=Object.keys(catMap).sort(function(a,b){ return catMap[b]-catMap[a]; });
   var catTotal=catRows.reduce(function(s,c){return s+catMap[c];},0);
 
-  // ── Category icons & colours ───────────────────────────────────────────────
   var catMeta={
     'Fuel':       {icon:'⛽',color:'#f97316',bg:'#fff7ed'},
     'Toll Tax':   {icon:'🛣️',color:'#8b5cf6',bg:'#ede9fe'},
@@ -3371,8 +3479,6 @@ function renderFundTracker(){
     'Other':      {icon:'📋',color:'#64748b',bg:'#f1f5f9'},
     'Fund Received':{icon:'💰',color:'#16a34a',bg:'#dcfce7'}
   };
-
-  // ── Vehicle colour palette ─────────────────────────────────────────────────
   var vColors=['#1a5fa8','#16a34a','#f97316','#8b5cf6','#0891b2'];
   var barCats=[
     {key:'fuel',  label:'Fuel',   color:'#f97316'},
@@ -3382,24 +3488,15 @@ function renderFundTracker(){
     {key:'other', label:'Other',  color:'#64748b'}
   ];
 
-  // ── Build analytics HTML ───────────────────────────────────────────────────
   var html='';
 
-  // ── Section 1: Vehicle Cards (full width) ─────────────────────────────────
-  html+='<div style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">'
-      +'<div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--navy)">🚛 Vehicle-wise Expense Breakdown</div>'
-      +'<div style="font-size:12px;color:var(--muted)">Total: <strong style="color:var(--red)">'+fmt(grandTotalExp)+'</strong></div>'
-    +'</div>';
-
+  html+='<div style="margin-bottom:6px;display:flex;align-items:center;justify-content:space-between"><div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--navy)">🚛 Vehicle-wise Expense Breakdown</div><div style="font-size:12px;color:var(--muted)">Total: <strong style="color:var(--red)">'+fmt(grandTotalExp)+'</strong></div></div>';
   html+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px">';
-
   vehData.forEach(function(d,i){
     var pct=grandTotalExp>0?Math.round(d.total/grandTotalExp*100):0;
     var col=vColors[i%vColors.length];
     var hasData=d.total>0;
     var opacity=hasData?'1':'0.45';
-
-    // Stacked bar segments
     var barHtml='';
     if(d.total>0){
       barCats.forEach(function(bc){
@@ -3408,43 +3505,11 @@ function renderFundTracker(){
         if(w>0) barHtml+='<div title="'+bc.label+': '+fmt(val)+'" style="height:100%;width:'+w+'%;background:'+bc.color+';transition:width .3s"></div>';
       });
     }
-
-    html+='<div style="background:var(--card);border:1.5px solid '+(hasData?col:'var(--border)')+';border-radius:12px;padding:14px;opacity:'+opacity+';transition:.2s;position:relative;overflow:hidden">'
-      // top accent bar
-      +'<div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+col+'"></div>'
-      // vehicle number
-      +'<div style="font-family:monospace;font-size:13px;font-weight:700;color:'+col+';margin-bottom:8px;margin-top:2px">'+d.v+'</div>'
-      // total amount
-      +'<div style="font-family:var(--fd);font-size:22px;font-weight:700;color:'+(hasData?'var(--navy)':'var(--muted)')+';line-height:1;margin-bottom:4px">'+(hasData?fmt(d.total):'No data')+'</div>'
-      // entries count + share
-      +'<div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+d.count+' entries &nbsp;·&nbsp; '+pct+'% of total</div>'
-      // stacked bar
-      +'<div style="height:6px;background:#f1f5f9;border-radius:3px;display:flex;overflow:hidden;margin-bottom:10px">'
-        +(hasData?barHtml:'')
-      +'</div>'
-      // breakdown grid
-      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'
-        +barCats.map(function(bc){
-          var val=d[bc.key]||0;
-          if(!val) return '';
-          return '<div style="background:'+bc.color+'18;border-radius:7px;padding:6px 8px;border:1px solid '+bc.color+'30">'
-            +'<div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">'+bc.label+'</div>'
-            +'<div style="font-size:13px;font-weight:700;color:#111827;line-height:1">'+fmt(val)+'</div>'
-          +'</div>';
-        }).join('')
-      +'</div>'
-    +'</div>';
+    html+='<div style="background:var(--card);border:1.5px solid '+(hasData?col:'var(--border)')+';border-radius:12px;padding:14px;opacity:'+opacity+';transition:.2s;position:relative;overflow:hidden"><div style="position:absolute;top:0;left:0;right:0;height:3px;background:'+col+'"></div><div style="font-family:monospace;font-size:13px;font-weight:700;color:'+col+';margin-bottom:8px;margin-top:2px">'+d.v+'</div><div style="font-family:var(--fd);font-size:22px;font-weight:700;color:'+(hasData?'var(--navy)':'var(--muted)')+';line-height:1;margin-bottom:4px">'+(hasData?fmt(d.total):'No data')+'</div><div style="font-size:11px;color:var(--muted);margin-bottom:10px">'+d.count+' entries &nbsp;·&nbsp; '+pct+'% of total</div><div style="height:6px;background:#f1f5f9;border-radius:3px;display:flex;overflow:hidden;margin-bottom:10px">'+(hasData?barHtml:'')+'</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:5px">'+barCats.map(function(bc){ var val=d[bc.key]||0; if(!val) return ''; return '<div style="background:'+bc.color+'18;border-radius:7px;padding:6px 8px;border:1px solid '+bc.color+'30"><div style="font-size:10px;font-weight:700;color:#374151;margin-bottom:2px;text-transform:uppercase;letter-spacing:.04em">'+bc.label+'</div><div style="font-size:13px;font-weight:700;color:#111827;line-height:1">'+fmt(val)+'</div></div>'; }).join('')+'</div></div>';
   });
-
   html+='</div>';
 
-  // ── Section 2: Category breakdown — full-width horizontal bar chart ─────────
-  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px">';
-  html+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
-      +'<div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--navy)">📊 Category-wise Expense</div>'
-      +'<div style="font-size:12px;color:var(--muted)">'+catRows.length+' categories &nbsp;·&nbsp; <strong style="color:var(--navy)">'+fmt(catTotal)+'</strong> total</div>'
-    +'</div>';
-
+  html+='<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px"><div style="font-family:var(--fd);font-size:15px;font-weight:700;color:var(--navy)">📊 Category-wise Expense</div><div style="font-size:12px;color:var(--muted)">'+catRows.length+' categories &nbsp;·&nbsp; <strong style="color:var(--navy)">'+fmt(catTotal)+'</strong> total</div></div>';
   if(catRows.length===0){
     html+='<div style="text-align:center;color:var(--muted);padding:20px;font-size:13px">No expense data for selected filters.</div>';
   } else {
@@ -3454,22 +3519,84 @@ function renderFundTracker(){
       var pct=catTotal>0?Math.round(val/catTotal*100):0;
       var meta=catMeta[c]||{icon:'📋',color:'#64748b',bg:'#f1f5f9'};
       var isLast=i===catRows.length-1;
-      html+=''
-        +'<div style="display:grid;align-items:center;grid-template-columns:22px 120px 1fr auto auto;gap:8px;padding:6px 0;'+(isLast?'':'border-bottom:1px solid #f1f5f9')+'">'
-          +'<div style="font-size:16px;text-align:center;line-height:1">'+meta.icon+'</div>'
-          +'<div style="font-size:12px;font-weight:700;color:var(--navy)">'+c+'</div>'
-          +'<div style="height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden">'
-            +'<div style="height:100%;width:'+pct+'%;background:'+meta.color+';border-radius:4px;transition:width .5s ease"></div>'
-          +'</div>'
-          +'<div style="font-size:11px;font-weight:700;color:'+meta.color+';white-space:nowrap">'+pct+'%</div>'
-          +'<div style="text-align:right;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap;min-width:90px">'+fmt(val)+'</div>'
-        +'</div>';
+      html+='<div style="display:grid;align-items:center;grid-template-columns:22px 120px 1fr auto auto;gap:8px;padding:6px 0;'+(isLast?'':'border-bottom:1px solid #f1f5f9')+'"><div style="font-size:16px;text-align:center;line-height:1">'+meta.icon+'</div><div style="font-size:12px;font-weight:700;color:var(--navy)">'+escHtml(c)+'</div><div style="height:7px;background:#f1f5f9;border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+meta.color+';border-radius:4px;transition:width .5s ease"></div></div><div style="font-size:11px;font-weight:700;color:'+meta.color+';white-space:nowrap">'+pct+'%</div><div style="text-align:right;font-family:var(--fd);font-size:14px;font-weight:700;color:var(--navy);white-space:nowrap;min-width:90px">'+fmt(val)+'</div></div>';
     });
     html+='</div>';
   }
   html+='</div>';
 
   document.getElementById('fund-analytics').innerHTML=html;
+}
+
+function excelEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function excelNum(v){ return Math.round(+v||0); }
+function exportFundExcel(){
+  var d1=(document.getElementById('fund-date-from')||{}).value||'';
+  var d2=(document.getElementById('fund-date-to')||{}).value||'';
+  if(!d1 || !d2){
+    toast('Please select From Date and To Date before exporting Excel.');
+    return;
+  }
+  var entries=fundFilteredEntries();
+  if(!entries.length){
+    toast('No fund entries found for selected date range.');
+    return;
+  }
+  entries=entries.slice().sort(function(a,b){
+    var ad=String(a.date||'');
+    var bd=String(b.date||'');
+    if(ad!==bd) return ad.localeCompare(bd);
+    return String(a.id||'').localeCompare(String(b.id||''));
+  });
+  var totalReceived=0;
+  var totalExpenses=0;
+  var rows='';
+  rows+='<table><tr>'+
+    '<th>S.No</th>'+
+    '<th>Date</th>'+
+    '<th>Account Name</th>'+
+    '<th>Expense Particulars</th>'+
+    '<th>Type of Expense</th>'+
+    '<th>Received</th>'+
+    '<th>Expenses</th>'+
+  '</tr>';
+  entries.forEach(function(e,i){
+    var isReceipt=(e.entryType==='Receipt');
+    var amount=excelNum(e.amount);
+    var received=isReceipt?amount:'';
+    var expense=isReceipt?'':amount;
+    if(isReceipt) totalReceived+=amount; else totalExpenses+=amount;
+    var particulars=e.particulars || e.source || e.note || e.category || '';
+    var expenseType=e.category || (isReceipt?'Received':'Expense');
+    rows+='<tr>'+
+      '<td>'+(i+1)+'</td>'+
+      '<td>'+excelEsc(e.date||'')+'</td>'+
+      '<td>'+excelEsc(e.account||'')+'</td>'+
+      '<td>'+excelEsc(particulars)+'</td>'+
+      '<td>'+excelEsc(expenseType)+'</td>'+
+      '<td>'+received+'</td>'+
+      '<td>'+expense+'</td>'+
+    '</tr>';
+  });
+  rows+='<tr class="total">'+
+    '<td></td>'+
+    '<td></td>'+
+    '<td></td>'+
+    '<td></td>'+
+    '<td>Total</td>'+
+    '<td>'+excelNum(totalReceived)+'</td>'+
+    '<td>'+excelNum(totalExpenses)+'</td>'+
+  '</tr></table>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><style>'+
+    'body{font-family:Arial,sans-serif}table{border-collapse:collapse;width:100%}th{background:#0f2137;color:#fff;font-weight:700}td,th{border:1px solid #cbd5e1;padding:7px 9px;font-size:12px;text-align:left}td:nth-child(1),td:nth-child(6),td:nth-child(7),th:nth-child(1),th:nth-child(6),th:nth-child(7){text-align:right}.total td{font-weight:700;background:#f8fafc}'+
+    '</style></head><body>'+rows+'</body></html>';
+  var blob=new Blob(['\ufeff'+html],{type:'application/vnd.ms-excel;charset=utf-8;'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='BGSG_Fund_Tracker_'+d1+'_to_'+d2+'.xls';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1200);
+  toast('Excel exported in required format for '+fundDateRangeLabel());
 }
 
 function filterFundByAccount(account){
