@@ -415,11 +415,12 @@ tr:hover td{background:#f8fafc}
 
 /* ── Fund Tracker Cashbook Table ─────────────────────────────────────────── */
 #pg-fundtracker.active{display:flex;flex-direction:column}
-#fund-entries-card{flex:1;min-height:0}
+#fund-entries-card{flex:1;min-height:0;display:flex;flex-direction:column}
 #fund-entries-wrap{
   overflow:auto;
-  max-height:calc(100vh - 420px);
+  max-height:calc(100vh - 310px);
   min-height:220px;
+  flex:1;
 }
 #fund-entries-table{
   width:100%;
@@ -474,7 +475,7 @@ tr:hover td{background:#f8fafc}
 
 
 /* ── Fund Tracker Efficiency Upgrade ───────────────────────────────────── */
-.fund-metrics-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:10px;margin-bottom:12px!important}
+.fund-metrics-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px;margin-bottom:12px!important}
 .fund-filter-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(15,33,55,.04)}
 .fund-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .fund-filter-title{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -501,7 +502,7 @@ tr:hover td{background:#f8fafc}
 .fund-transfer-route{font-weight:800;color:var(--navy)}
 .fund-transfer-amt{font-family:var(--fd);font-size:15px;font-weight:800;color:var(--blue);text-align:right}
 .fund-empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
-#fund-entries-wrap{max-height:calc(100vh - 360px)}
+#fund-entries-wrap{max-height:calc(100vh - 310px);flex:1;min-height:0}
 @media (max-width:1280px){.fund-metrics-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}.fund-filter-grid{grid-template-columns:repeat(3,minmax(150px,1fr))}.fund-mini-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (max-width:900px){.fund-account-grid{grid-template-columns:1fr}.fund-transfer-row{grid-template-columns:80px 1fr 90px}.fund-transfer-row .fund-transfer-note,.fund-transfer-row .fund-transfer-actions{display:none}}
 @media (max-width:760px){.fund-metrics-grid,.fund-filter-grid{grid-template-columns:1fr!important}.fund-filter-actions{width:100%;justify-content:stretch}.fund-filter-actions .btn{flex:1;justify-content:center}.fund-mini-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -608,31 +609,40 @@ tr:hover td{background:#f8fafc}
       <!-- STATUS TILES -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
 
-        <div onclick="filterByStatus('In Transit')" style="cursor:pointer;background:linear-gradient(135deg,#d97706 0%,#f59e0b 100%);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 14px #d9770630;transition:.2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">In Transit</div>
-            <div id="cnt-transit" style="font-family:var(--fd);font-size:42px;font-weight:700;color:#fff;line-height:1">0</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px">Active shipments</div>
+        <div onclick="filterByStatus('In Transit')" style="cursor:pointer;background:#fff;border-radius:14px;padding:0;display:flex;align-items:stretch;box-shadow:0 2px 10px rgba(0,0,0,.07);transition:.2s;border:1px solid #e9f0f7;overflow:hidden" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(217,119,6,.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 10px rgba(0,0,0,.07)'">
+          <div style="width:6px;background:linear-gradient(180deg,#f59e0b,#d97706);flex-shrink:0;border-radius:14px 0 0 14px"></div>
+          <div style="flex:1;padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:10px;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px">In Transit</div>
+              <div id="cnt-transit" style="font-family:var(--fd);font-size:44px;font-weight:800;color:#b45309;line-height:1">0</div>
+              <div style="font-size:11px;color:#a16207;margin-top:5px;font-weight:500">Active shipments</div>
+            </div>
+            <div style="width:48px;height:48px;background:linear-gradient(135deg,#fef3c7,#fde68a);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">🚛</div>
           </div>
-          <div style="font-size:40px;opacity:1">🚛</div>
         </div>
 
-        <div onclick="filterByStatus('Delivered')" style="cursor:pointer;background:linear-gradient(135deg,#059669 0%,#10b981 100%);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 14px #05966930;transition:.2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Delivered</div>
-            <div id="cnt-delivered" style="font-family:var(--fd);font-size:42px;font-weight:700;color:#fff;line-height:1">0</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px">Completed trips</div>
+        <div onclick="filterByStatus('Delivered')" style="cursor:pointer;background:#fff;border-radius:14px;padding:0;display:flex;align-items:stretch;box-shadow:0 2px 10px rgba(0,0,0,.07);transition:.2s;border:1px solid #e9f0f7;overflow:hidden" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(5,150,105,.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 10px rgba(0,0,0,.07)'">
+          <div style="width:6px;background:linear-gradient(180deg,#10b981,#059669);flex-shrink:0;border-radius:14px 0 0 14px"></div>
+          <div style="flex:1;padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:10px;font-weight:800;color:#065f46;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px">Delivered</div>
+              <div id="cnt-delivered" style="font-family:var(--fd);font-size:44px;font-weight:800;color:#047857;line-height:1">0</div>
+              <div style="font-size:11px;color:#059669;margin-top:5px;font-weight:500">Completed trips</div>
+            </div>
+            <div style="width:48px;height:48px;background:linear-gradient(135deg,#d1fae5,#a7f3d0);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">✅</div>
           </div>
-          <div style="font-size:40px;opacity:1">✅</div>
         </div>
 
-        <div onclick="filterByStatus('To Be Planned')" style="cursor:pointer;background:linear-gradient(135deg,#2563eb 0%,#3b82f6 100%);border-radius:14px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 14px #2563eb30;transition:.2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
-          <div>
-            <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.75);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">To Be Planned</div>
-            <div id="cnt-planned" style="font-family:var(--fd);font-size:42px;font-weight:700;color:#fff;line-height:1">0</div>
-            <div style="font-size:11px;color:rgba(255,255,255,.7);margin-top:4px">Awaiting dispatch</div>
+        <div onclick="filterByStatus('To Be Planned')" style="cursor:pointer;background:#fff;border-radius:14px;padding:0;display:flex;align-items:stretch;box-shadow:0 2px 10px rgba(0,0,0,.07);transition:.2s;border:1px solid #e9f0f7;overflow:hidden" onmouseover="this.style.transform='translateY(-2px)';this.style.boxShadow='0 6px 20px rgba(37,99,235,.15)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 10px rgba(0,0,0,.07)'">
+          <div style="width:6px;background:linear-gradient(180deg,#3b82f6,#2563eb);flex-shrink:0;border-radius:14px 0 0 14px"></div>
+          <div style="flex:1;padding:16px 18px;display:flex;align-items:center;justify-content:space-between">
+            <div>
+              <div style="font-size:10px;font-weight:800;color:#1e3a8a;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px">To Be Planned</div>
+              <div id="cnt-planned" style="font-family:var(--fd);font-size:44px;font-weight:800;color:#1d4ed8;line-height:1">0</div>
+              <div style="font-size:11px;color:#2563eb;margin-top:5px;font-weight:500">Awaiting dispatch</div>
+            </div>
+            <div style="width:48px;height:48px;background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">📋</div>
           </div>
-          <div style="font-size:40px;opacity:1">📋</div>
         </div>
 
       </div>
@@ -3407,12 +3417,11 @@ function renderFundTracker(){
   var balanceMap=getCashEntryBalanceMap();
 
   document.getElementById('fund-metrics').innerHTML=
-    fundMetric('Selected Receipts',selectedReceipts,'var(--green)',fundDateRangeLabel(),'💰','')+
-    fundMetric('Selected Expenses',selectedExpenses,'var(--red)',data.length+' cashbook entries','💸','')+
-    fundMetric('Selected Net',selectedNet,selectedNet>=0?'var(--green)':'var(--red)','Receipts - expenses','📈','')+
+    fundMetric('Receipts',selectedReceipts,'var(--green)',fundDateRangeLabel(),'💰','')+
+    fundMetric('Expenses',selectedExpenses,'var(--red)',data.length+' cashbook entries','💸','')+
+    fundMetric('Combined Balance',combinedBal,combinedBal>=0?'var(--green)':'var(--red)','Pawan + Karan','🏦','')+
     fundMetric('Pawan Live Balance',pBal,pBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Pawan\')')+
-    fundMetric('Karan Live Balance',kBal,kBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Karan\')')+
-    fundMetric('Combined Balance',combinedBal,combinedBal>=0?'var(--green)':'var(--red)','Pawan + Karan','🏦','');
+    fundMetric('Karan Live Balance',kBal,kBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Karan\')');
 
   var activeAccount=(document.getElementById('fund-account')||{}).value||'';
   var activeVehicle=(document.getElementById('fund-vehicle')||{}).value||'';
