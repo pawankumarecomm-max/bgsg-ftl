@@ -475,7 +475,7 @@ tr:hover td{background:#f8fafc}
 
 
 /* ── Fund Tracker Efficiency Upgrade ───────────────────────────────────── */
-.fund-metrics-grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:10px;margin-bottom:12px!important}
+.fund-metrics-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:10px;margin-bottom:12px!important}
 .fund-filter-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(15,33,55,.04)}
 .fund-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
 .fund-filter-title{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -483,10 +483,11 @@ tr:hover td{background:#f8fafc}
 .fund-filter-grid{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(6,minmax(120px,1fr));gap:10px;align-items:end}
 .fund-filter-grid .sbox,.fund-filter-grid .flt{width:100%;height:34px;font-size:12px}
 .fund-filter-label{font-size:10px;color:var(--muted);font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
-.fund-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.fund-account-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
 .fund-account-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;overflow:hidden;box-shadow:0 1px 3px rgba(15,33,55,.04)}
 .fund-account-card:before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:var(--blue)}
 .fund-account-card.karan:before{background:var(--purple)}
+.fund-account-card.paytap:before{background:var(--green)}
 .fund-account-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
 .fund-account-name{font-family:var(--fd);font-size:19px;font-weight:800;color:var(--navy);line-height:1}
 .fund-account-bal{font-family:var(--fd);font-size:24px;font-weight:800;line-height:1;text-align:right}
@@ -731,7 +732,7 @@ tr:hover td{background:#f8fafc}
         <div class="fund-filter-head">
           <div>
             <div class="fund-filter-title">Cashbook Control Center</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:3px">Two-account ledger for Pawan and Karan with date-wise Excel export.</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px">Three-account ledger for Pawan, Karan and Paytap with date-wise Excel export.</div>
           </div>
           <div class="fund-filter-actions">
             <button class="btn btns btnp" onclick="openCashEntryModal()">+ Cash Entry</button>
@@ -744,7 +745,7 @@ tr:hover td{background:#f8fafc}
           <div><div class="fund-filter-label">Search</div><input class="sbox" id="fund-search" placeholder="Search account, vehicle, category, note…" oninput="renderFundTracker()"></div>
           <div><div class="fund-filter-label">From Date</div><input class="flt" type="date" id="fund-date-from" onchange="renderFundTracker()"></div>
           <div><div class="fund-filter-label">To Date</div><input class="flt" type="date" id="fund-date-to" onchange="renderFundTracker()"></div>
-          <div><div class="fund-filter-label">Account</div><select class="flt" id="fund-account" onchange="renderFundTracker()"><option value="">All Accounts</option><option>Pawan</option><option>Karan</option></select></div>
+          <div><div class="fund-filter-label">Account</div><select class="flt" id="fund-account" onchange="renderFundTracker()"><option value="">All Accounts</option><option>Pawan</option><option>Karan</option><option>Paytap</option></select></div>
           <div><div class="fund-filter-label">Type</div><select class="flt" id="fund-type" onchange="renderFundTracker()"><option value="">All Types</option><option>Receipt</option><option>Expense</option></select></div>
           <div><div class="fund-filter-label">Category</div><select class="flt" id="fund-category" onchange="renderFundTracker()"><option value="">All Categories</option></select></div>
           <div><div class="fund-filter-label">Vehicle</div><select class="flt" id="fund-vehicle" onchange="renderFundTracker()"><option value="">All Vehicles</option></select></div>
@@ -1404,7 +1405,7 @@ tr:hover td{background:#f8fafc}
     <div class="mdlgb">
       <div class="fgrid">
         <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="fund-entry-date"></div>
-        <div class="fgrp"><label class="flbl">Account</label><select class="finp" id="fund-entry-account"><option>Pawan</option><option>Karan</option></select></div>
+        <div class="fgrp"><label class="flbl">Account</label><select class="finp" id="fund-entry-account"><option>Pawan</option><option>Karan</option><option>Paytap</option></select></div>
         <div class="fgrp"><label class="flbl">Entry Type</label><select class="finp" id="fund-entry-type" onchange="syncFundEntryForm(null)"><option>Receipt</option><option>Expense</option></select></div>
         <div class="fgrp"><label class="flbl">Source / Party</label><input class="finp" id="fund-entry-source" placeholder="Company / Transporter / Vendor"></div>
         <div class="fgrp"><label class="flbl">Category</label><select class="finp" id="fund-entry-category"></select></div>
@@ -1429,13 +1430,13 @@ tr:hover td{background:#f8fafc}
 <!-- FUND TRANSFER MODAL -->
 <div class="mover" id="mo-fund-transfer">
   <div class="mdlg" style="width:500px">
-    <div class="mdlgh"><div class="mdlgt">Transfer Between Pawan &amp; Karan</div><button class="mdlgx" onclick="closeModal('mo-fund-transfer')">✕</button></div>
+    <div class="mdlgh"><div class="mdlgt">Transfer Between Accounts</div><button class="mdlgx" onclick="closeModal('mo-fund-transfer')">✕</button></div>
     <div class="mdlgb">
       <div class="fgrid">
         <div class="fgrp"><label class="flbl">Date</label><input class="finp" type="date" id="fund-transfer-date"></div>
         <div class="fgrp"><label class="flbl">Amount</label><input class="finp" type="number" id="fund-transfer-amount" placeholder="0"></div>
-        <div class="fgrp"><label class="flbl">From Account</label><select class="finp" id="fund-transfer-from"><option>Pawan</option><option>Karan</option></select></div>
-        <div class="fgrp"><label class="flbl">To Account</label><select class="finp" id="fund-transfer-to"><option>Karan</option><option>Pawan</option></select></div>
+        <div class="fgrp"><label class="flbl">From Account</label><select class="finp" id="fund-transfer-from"><option>Pawan</option><option>Karan</option><option>Paytap</option></select></div>
+        <div class="fgrp"><label class="flbl">To Account</label><select class="finp" id="fund-transfer-to"><option>Karan</option><option>Pawan</option><option>Paytap</option></select></div>
         <div class="fgrp full"><label class="flbl">Note</label><input class="finp" id="fund-transfer-note" placeholder="Cash handed over for expenses"></div>
       </div>
     </div>
@@ -1636,7 +1637,7 @@ function plTD(v){ v=+v||0; if(v>0)return '<td class="tpro">'+fmt(v)+'</td>'; if(
 function getTripExp(tid){ return APP.expenses.filter(function(e){return String(e.tripId)===String(tid);}); }
 function parseNum(v){ return parseFloat(v)||0; }
 
-var CASH_ACCOUNTS=['Pawan','Karan'];
+var CASH_ACCOUNTS=['Pawan','Karan','Paytap'];
 var CASH_CATEGORIES=['Fund Received','Fuel','Toll Tax','Driver Fooding','Maintenance','Unloading','Porter','Other'];
 // Fixed validated vehicle list — canonical (no leading zeros after state code)
 var CASH_VEHICLES=['DL01LAL0970','DL01LY8139','DL01MB4318','HR63G9386','KA02AN0024'];
@@ -1704,7 +1705,7 @@ function cashEventSort(a,b){
 }
 function getCashEntryBalanceMap(){
   var ledger={};
-  ['Pawan','Karan'].forEach(function(account){
+  ['Pawan','Karan','Paytap'].forEach(function(account){
     var events=[];
     (APP.cashEntries||[]).forEach(function(e){
       if(e.account!==account) return;
@@ -2680,6 +2681,7 @@ function aiAccountFromQuestion(q){
   var s=String(q||'').toLowerCase();
   if(/\bpawan\b/.test(s)) return 'Pawan';
   if(/\bkaran\b/.test(s)) return 'Karan';
+  if(/\bpaytap\b/.test(s)) return 'Paytap';
   return '';
 }
 function aiCashEntryIsExpense(e){
@@ -2702,7 +2704,7 @@ function aiUseExactLocalAnswer(q, ans){
   var s=String(q||'').toLowerCase();
   var a=String(ans||'');
   // Anything asking totals/lists from saved records must not be re-calculated by the LLM.
-  if(aiExpenseIntent(q) || /(fund|cash|kharcha|kharch|pawan|karan)/.test(s)) return true;
+  if(aiExpenseIntent(q) || /(fund|cash|kharcha|kharch|pawan|karan|paytap)/.test(s)) return true;
   if(/^(Matching shipments:|Currently In Transit:|Delivered shipments:|To Be Planned shipments:)/.test(a)) return true;
   if(/(show|list|total|count|how many|pending|unpaid|paid|delivered|in transit|transit)/.test(s) && /(trip|shipment|vehicle|invoice|lr|vendor|payment|party|pod)/.test(s)) return true;
   return false;
@@ -2718,7 +2720,7 @@ function aiFundDiagnostics(vehicle, category, rng, account){
 }
 function aiAnswerFundExpenseQuery(q){
   var s=String(q||'').toLowerCase();
-  if(!aiExpenseIntent(q) && !/(fund|cash|pawan|karan)/.test(s)) return null;
+  if(!aiExpenseIntent(q) && !/(fund|cash|pawan|karan|paytap)/.test(s)) return null;
   var vehicle=aiFindVehicleInQuestion(q);
   var category=aiExpenseCategoryFromQuestion(q);
   var account=aiAccountFromQuestion(q);
@@ -2828,8 +2830,8 @@ function aiAnswer(q){
   if(/vehicle tracker|expiry|permit|insurance|fitness|pollution|national permit/.test(s)){
     return 'Vehicle Tracker stores vehicle documents and maintenance records. It highlights expired records in red and near-expiry records in orange. Use + Vehicle Record to add Insurance, Fitness, Pollution, National Permit and other records.';
   }
-  if(/fund|cash|pawan|karan|expense/.test(s)){
-    return 'Fund Tracker records money received by Pawan/Karan, transfers, and expenses by vehicle/category. You can ask data questions like:\n• fuel expense of DL01LAL0970 last 2 days\n• toll expense for HR55BA667 this month\n• total expense of 0970 today\n\nI will read saved Fund Tracker entries and show total plus entry details.';
+  if(/fund|cash|pawan|karan|paytap|expense/.test(s)){
+    return 'Fund Tracker records money received by Pawan/Karan/Paytap, transfers, and expenses by vehicle/category. You can ask data questions like:\n• fuel expense of DL01LAL0970 last 2 days\n• toll expense for HR55BA667 this month\n• total expense of 0970 today\n\nI will read saved Fund Tracker entries and show total plus entry details.';
   }
   if(/sync|cloud|supabase|not saving|local save|rls|permission/.test(s)){
     return 'Sync checklist:\n1. Confirm Supabase URL/key are correct.\n2. Check the Sync status on top right.\n3. If it says Local save only, the browser saved data locally but cloud rejected it.\n4. Common causes: missing table/column, RLS policy blocking insert/update, or internet issue.\n5. Do not clear browser data before cloud sync is fixed.';
@@ -3413,15 +3415,17 @@ function renderFundTracker(){
   var selectedNet=selectedReceipts-selectedExpenses;
   var pBal=cashBalance('Pawan');
   var kBal=cashBalance('Karan');
-  var combinedBal=pBal+kBal;
+  var ptBal=cashBalance('Paytap');
+  var combinedBal=pBal+kBal+ptBal;
   var balanceMap=getCashEntryBalanceMap();
 
   document.getElementById('fund-metrics').innerHTML=
     fundMetric('Receipts',selectedReceipts,'var(--green)',fundDateRangeLabel(),'💰','')+
     fundMetric('Expenses',selectedExpenses,'var(--red)',data.length+' cashbook entries','💸','')+
-    fundMetric('Combined Balance',combinedBal,combinedBal>=0?'var(--green)':'var(--red)','Pawan + Karan','🏦','')+
+    fundMetric('Combined Balance',combinedBal,combinedBal>=0?'var(--green)':'var(--red)','Pawan + Karan + Paytap','🏦','')+
     fundMetric('Pawan Live Balance',pBal,pBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Pawan\')')+
-    fundMetric('Karan Live Balance',kBal,kBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Karan\')');
+    fundMetric('Karan Live Balance',kBal,kBal>=0?'var(--green)':'var(--red)','Click to filter','👤','filterFundByAccount(\'Karan\')')+
+    fundMetric('Paytap Live Balance',ptBal,ptBal>=0?'var(--green)':'var(--red)','Click to filter','💳','filterFundByAccount(\'Paytap\')');
 
   var activeAccount=(document.getElementById('fund-account')||{}).value||'';
   var activeVehicle=(document.getElementById('fund-vehicle')||{}).value||'';
