@@ -1600,7 +1600,7 @@ tr:hover td{background:#f8fafc}
 // BGSG LOGISTICS — Supabase Edition (No Apps Script)
 // ═══════════════════════════════════════════════════
 var SUPA_URL = 'https://lnjnsnzbhevkzbwjvmmg.supabase.co';
-var SUPA_KEY = 'sb_publishable_ts7mzBjNAl7swWH3CfyquQ_p3ufnnVR';
+var SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxuam5zbnpiaGV2a3pid2p2bW1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3OTIxOTYsImV4cCI6MjA5MDM2ODE5Nn0.GsAvBPjN608pJBZm3ApSBiNESbsWXIs9hzO8Cfi6I-g';
 var SB_HDR = {
   'apikey': SUPA_KEY,
   'Authorization': 'Bearer ' + SUPA_KEY,
@@ -1620,14 +1620,26 @@ function sbFetch(url, options, cb, retryCount, timeoutMs){
   var attempt = 0;
   function run(){
     attempt++;
-    var ctrl = typeof AbortController!=='undefined' ? new AbortController() : null;
-    var opt = Object.assign({}, options||{});
-    if(ctrl) opt.signal = ctrl.signal;
-    var timer = setTimeout(function(){ if(ctrl) ctrl.abort(); }, timeoutMs);
-    fetch(url, opt)
-      .then(function(r){ clearTimeout(timer); cb(null, r); })
+    var settled = false;
+    // NOTE: deliberately NOT using AbortController/signal here — in this
+    // sandboxed environment fetch is proxied via postMessage, and an
+    // AbortSignal can't be structured-cloned, which throws
+    // "Failed to execute 'postMessage': AbortSignal object could not be
+    // cloned" and kills the request before it ever reaches the network.
+    var timer = setTimeout(function(){
+      if(settled) return;
+      settled = true;
+      if(attempt <= retryCount){ run(); return; }
+      cb(new Error('Request timed out'));
+    }, timeoutMs);
+    fetch(url, options||{})
+      .then(function(r){
+        if(settled) return;
+        settled = true; clearTimeout(timer); cb(null, r);
+      })
       .catch(function(e){
-        clearTimeout(timer);
+        if(settled) return;
+        settled = true; clearTimeout(timer);
         if(attempt <= retryCount){ setTimeout(run, attempt*350); return; }
         cb(e);
       });
@@ -4714,25 +4726,53 @@ function saveTrip(){
   saveAppCache();
   closeModal('mo-trip'); renderPage(curPage); populateMonthDropdowns(); populateTripFilters(); populateConsigneeDatalists(); refreshVehicleDocUI(); populateFundDropdowns();
   syncSt('save','Saving…');
+  var codeRetries=0;
+  var attemptSave=function(){
   var done=function(err,row){
     btn.disabled=false; btn.textContent='Save Trip';
     if(!err && row && row.id){ trip.id=String(row.id); clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
     else if(!err){ clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
     else {
       var msg=sbErrText(err);
+      if(/23505/.test(msg) && /trip_code/i.test(msg) && codeRetries<5){
+        // Duplicate trip code (another device/session already used this number) —
+        // bump past every code we know about, locally and in this error, and retry.
+        codeRetries++;
+        var maxKnown=(APP.trips||[]).reduce(function(m,t){ return Math.max(m, parseTrailingNum(t.tripCode||'')); },0);
+        trip.tripCode='BGSG'+zeroPad(Math.max(maxKnown, parseTrailingNum(trip.tripCode))+1,4);
+        var tcEl=document.getElementById('t-trip-code'); if(tcEl) tcEl.value=trip.tripCode;
+        if(editTripId) APP.trips=APP.trips.map(function(t){return String(t.id)===String(trip.id)?trip:t;}); else { var ix=APP.trips.findIndex(function(t){return String(t.id)===String(trip.id);}); if(ix>=0) APP.trips[ix]=trip; }
+        markPendingUpsert('trips', trip.id, trip); saveAppCache(); renderPage(curPage); populateTripFilters();
+        attemptSave();
+        return;
+      }
       if(/column .*trip_code.* does not exist|Could not find.*trip_code|column .*bill_to_consignee.* does not exist|Could not find.*bill_to_consignee|column .*bill_to_gst.* does not exist|Could not find.*bill_to_gst|schema cache/i.test(msg)){
         syncSt('err','Trips schema update needed');
         toast('Saved locally. Run trips SQL update for Trip ID / Bill To / GST columns.');
       } else if(/new row violates row-level security policy|permission denied|401|403/i.test(msg)){
         syncSt('err','Trips permission error');
         toast('Saved locally. Trips table RLS/policy is blocking cloud save. Run the trips sync SQL once.');
+      } else if(/no unique or exclusion constraint|42P10/i.test(msg)){
+        syncSt('err','Trips table needs a unique id constraint');
+        toast('Saved locally. Add a UNIQUE constraint on trips.id in Supabase (upsert needs it): ALTER TABLE trips ADD CONSTRAINT trips_id_key UNIQUE (id);');
+      } else if(/violates not-null constraint/i.test(msg)){
+        syncSt('err','Trips missing required field');
+        toast('Saved locally. Trips cloud sync failed — a required column is empty: '+msg.slice(0,120));
+      } else if(/invalid input syntax/i.test(msg)){
+        syncSt('err','Trips field type mismatch');
+        toast('Saved locally. Trips cloud sync failed — a field type doesn\'t match the column: '+msg.slice(0,120));
+      } else if(/Failed to fetch|NetworkError|TypeError: Load failed/i.test(msg)){
+        syncSt('err','No connection');
+        toast('Saved locally. Trips cloud sync failed — no network connection to Supabase right now. It will sync next time you save.');
       } else {
         syncSt('err','Sync error');
-        toast('Saved locally. Trips cloud sync failed; local edit will not be overwritten by sync.');
+        toast('Saved locally. Trips cloud sync failed: '+msg.slice(0,150));
       }
     }
   };
   sbUpsert('trips', tripToRow(trip), function(e,r){ done(e,r); });
+  };
+  attemptSave();
 }
 function deleteTrip(tid){
   if(!confirm('Delete this trip and all linked expenses?')) return;
@@ -5286,62 +5326,113 @@ function buildInvoiceSheetHtml(rec){
   if(trips.length>1) serviceDesc += ' for '+trips.length+' trips';
   else if(primary) serviceDesc += ' for '+escHtml((primary.from||'-')+' to '+(primary.to||'-'));
   var tripRefs=trips.length?trips.map(function(t){ return escHtml((t.tripCode||t.id)+' · '+(t.from||'-')+' to '+(t.to||'-')+' · '+fmt(t.amount)); }).join('<br>'):escHtml(primary&&primary.tripCode?primary.tripCode:(primary&&primary.id?primary.id:'-'));
-  return '<div style="background:#fff;border:1px solid #cbd5e1;overflow:auto"><div style="min-width:760px;border:2px solid #1f2937;font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff">'
+  return '<div style="background:#fff;border:1px solid #cbd5e1;overflow:auto"><div style="width:100%;max-width:794px;margin:0 auto;border:2px solid #1f2937;font-family:Arial,Helvetica,sans-serif;color:#111;background:#fff;font-size:11px">'
     +'<div style="display:grid;grid-template-columns:58% 42%;border-bottom:1.5px solid #1f2937">'
-      +'<div style="padding:16px 16px 12px"><img src="'+BGSG_LOGO_DATA+'" alt="BGSG Logistics" style="max-width:100%;width:520px;height:auto;display:block"></div>'
-      +'<div style="border-left:1.5px solid #1f2937;padding:16px 16px 12px;text-align:right">'
-        +'<div style="font-size:28px;font-weight:900;letter-spacing:.08em;color:#0f2137">TAX INVOICE</div>'
-        +'<div style="margin-top:8px;font-size:12px;line-height:1.55"><strong>Invoice No:</strong> '+escHtml(rec.invoiceNo||'-')+'<br><strong>Invoice Date:</strong> '+escHtml(fmtDateDot(rec.date)||'-')+'<br><strong>Due Date:</strong> '+escHtml(fmtDateDot(rec.dueDate)||'-')+'</div>'
+      +'<div style="padding:8px 10px 6px"><img src="'+BGSG_LOGO_DATA+'" alt="BGSG Logistics" style="max-width:100%;width:400px;height:auto;display:block"></div>'
+      +'<div style="border-left:1.5px solid #1f2937;padding:8px 12px 6px;text-align:right">'
+        +'<div style="font-size:22px;font-weight:900;letter-spacing:.08em;color:#0f2137">TAX INVOICE</div>'
+        +'<div style="margin-top:5px;font-size:11px;line-height:1.5"><strong>Invoice No:</strong> '+escHtml(rec.invoiceNo||'-')+'<br><strong>Invoice Date:</strong> '+escHtml(fmtDateDot(rec.date)||'-')+'<br><strong>Due Date:</strong> '+escHtml(fmtDateDot(rec.dueDate)||'-')+'</div>'
       +'</div>'
     +'</div>'
     +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
       +'<tr>'
-        +'<td style="width:50%;border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:12px 14px;vertical-align:top">'
-          +'<div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">Bill From</div>'
-          +'<div style="font-size:14px;font-weight:800;margin-bottom:4px">'+escHtml(BILL_FROM_COMPANY)+'</div>'
-          +'<div style="font-size:12px;line-height:1.55">'+escHtml(BILL_FROM_ADDRESS)+'<br>GSTIN: '+escHtml(BILL_FROM_GST)+'<br>Email: logistics@packtek.in<br>Phone: 9599818939, 9599818935</div>'
+        +'<td style="width:50%;border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:8px 10px;vertical-align:top">'
+          +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:3px">Bill From</div>'
+          +'<div style="font-size:12px;font-weight:800;margin-bottom:2px">'+escHtml(BILL_FROM_COMPANY)+'</div>'
+          +'<div style="font-size:10px;line-height:1.5">'+escHtml(BILL_FROM_ADDRESS)+'<br>GSTIN: '+escHtml(BILL_FROM_GST)+'<br>Email: logistics@packtek.in<br>Phone: 9599818939, 9599818935</div>'
         +'</td>'
-        +'<td style="width:50%;border-bottom:1px solid #1f2937;padding:12px 14px;vertical-align:top">'
-          +'<div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">Bill To</div>'
-          +'<div style="font-size:14px;font-weight:800;margin-bottom:4px">'+escHtml(customerName)+'</div>'
-          +'<div style="font-size:12px;line-height:1.55;white-space:pre-line">'+escHtml(customerAddress||'-')+(customerGst?('<br>GSTIN: '+escHtml(customerGst)):'')+(customerContact?('<br>Contact: '+escHtml(customerContact)):'')+'</div>'
-          +'<div style="margin-top:8px;font-size:12px;line-height:1.55"><strong>Linked LR:</strong> '+escHtml(lr&&lr.lrNo?lr.lrNo:'-')+'<br><strong>Trip Ref:</strong><br>'+tripRefs+'</div>'
+        +'<td style="width:50%;border-bottom:1px solid #1f2937;padding:8px 10px;vertical-align:top">'
+          +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:3px">Bill To</div>'
+          +'<div style="font-size:12px;font-weight:800;margin-bottom:2px">'+escHtml(customerName)+'</div>'
+          +'<div style="font-size:10px;line-height:1.5;white-space:pre-line">'+escHtml(customerAddress||'-')+(customerGst?('<br>GSTIN: '+escHtml(customerGst)):'')+(customerContact?('<br>Contact: '+escHtml(customerContact)):'')+'</div>'
+          +(lr&&lr.lrNo?('<div style="margin-top:4px;font-size:10px;line-height:1.5"><strong>Linked LR:</strong> '+escHtml(lr.lrNo)+'</div>'):'')
         +'</td>'
       +'</tr>'
     +'</table>'
+    +(function(){
+        var B='border:1px solid #1f2937;';
+        var Br='border-right:1px solid #1f2937;';
+        var Bb='border-bottom:1px solid #1f2937;';
+        var tripList=trips.length?trips:(primary?[primary]:[]);
+        var gstPct=+rec.gstPct||0;
+        var savedGstAmt=+rec.gstAmount||0;
+        // Always compute subtotal from actual trip amounts
+        var computedSubtotal=tripList.reduce(function(s,t){return s+(+t.amount||0);},0);
+        var subtotal=computedSubtotal||+rec.taxableAmount||0;
+        // Only apply GST if both % is set AND saved gstAmount is > 0
+        var hasGst=gstPct>0 && savedGstAmt>0;
+        var gstAmt=hasGst?savedGstAmt:0;
+        var grandTotal=subtotal+gstAmt;
+        // Columns: Sn | Date | Trip ID | From | Ship To | Vehicle | Total Payable
+        var tH='<table style="width:100%;border-collapse:collapse;border:1px solid #1f2937;font-family:Arial,Helvetica,sans-serif;font-size:10.5px">';
+        var cols='<colgroup>'
+          +'<col style="width:4%">'    // Sn
+          +'<col style="width:11%">'   // Date
+          +'<col style="width:12%">'   // Trip ID
+          +'<col style="width:10%">'   // From
+          +'<col style="width:14%">'   // Ship To
+          +'<col style="width:14%">'   // Vehicle
+          +'<col style="width:13%">'   // Total Payable
+          +'</colgroup>';
+        // Service heading row
+        var headingRow='<tr><td colspan="7" style="text-align:center;'+Bb+'padding:7px 8px;font-size:12px;font-weight:700;color:#1e293b">'+escHtml(serviceDesc+(lr&&lr.description?' — Goods: '+lr.description:''))+'</td></tr>';
+        // Column header row
+        var thS='padding:5px 5px;font-size:10px;font-weight:800;color:#1e293b;'+Bb;
+        var hdr='<tr>'
+          +'<th style="'+thS+Br+'text-align:center">Sn</th>'
+          +'<th style="'+thS+Br+'text-align:left">Date</th>'
+          +'<th style="'+thS+Br+'text-align:left">Trip ID</th>'
+          +'<th style="'+thS+Br+'text-align:left">From</th>'
+          +'<th style="'+thS+Br+'text-align:left">Ship to</th>'
+          +'<th style="'+thS+Br+'text-align:left">Vehicle</th>'
+          +'<th style="'+thS+'text-align:right">Total Payable</th>'
+          +'</tr>';
+        // Per-trip rows
+        var tripRows=tripList.map(function(t,i){
+          return '<tr>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;text-align:center;color:#64748b;font-size:10px">'+(i+1)+'</td>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;white-space:nowrap;font-size:10px">'+escHtml(fmtDate(t.date)||'-')+'</td>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;font-weight:700;color:#1a5fa8;font-family:monospace;font-size:10px">'+escHtml(t.tripCode||t.id||'-')+'</td>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;font-size:10px">'+escHtml(t.from||'-')+'</td>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;font-size:10px">'+escHtml(t.to||'-')+'</td>'
+            +'<td style="'+Bb+Br+'padding:4px 4px;font-family:monospace;font-size:10px">'+escHtml(t.vehicle||'-')+'</td>'
+            +'<td style="'+Bb+'padding:4px 6px;text-align:right;font-weight:700;font-size:10px">'+fmt(t.amount)+'</td>'
+            +'</tr>';
+        }).join('');
+        // Subtotal row
+        var subRow='<tr>'
+          +'<td colspan="5" style="'+Bb+Br+'padding:5px 4px"></td>'
+          +'<td style="'+Bb+Br+'padding:5px 6px;font-weight:800;color:#1e293b;font-size:10.5px">Subtotal</td>'
+          +'<td style="'+Bb+'padding:5px 6px;text-align:right;font-weight:800;font-size:10.5px">'+fmt(subtotal)+'</td>'
+          +'</tr>';
+        // GST row — blank if no GST selected
+        var gstRow='<tr>'
+          +'<td colspan="5" style="'+Bb+Br+'padding:5px 4px"></td>'
+          +'<td style="'+Bb+Br+'padding:5px 6px;color:#1e293b;font-size:10.5px">GST'+(hasGst?' ('+gstPct+'%)':'')+'</td>'
+          +'<td style="'+Bb+'padding:5px 6px;text-align:right;font-weight:700;font-size:10.5px">'+(hasGst?fmt(gstAmt):'')+'</td>'
+          +'</tr>';
+        // Grand total row
+        var grandRow='<tr style="background:#f0f6ff">'
+          +'<td colspan="5" style="'+Bb+Br+'padding:6px 4px"></td>'
+          +'<td style="'+Bb+Br+'padding:6px 6px;font-weight:800;font-size:11px;color:#1e293b">Grand Total</td>'
+          +'<td style="'+Bb+'padding:6px 6px;text-align:right;font-weight:900;font-size:11.5px;color:#1a5fa8">'+fmt(grandTotal)+'</td>'
+          +'</tr>';
+        return tH+cols+headingRow+hdr+tripRows+subRow+gstRow+grandRow+'</table>';
+      })()
     +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
       +'<tr>'
-        +'<th style="border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:9px 8px;background:#f8fafc;font-size:11px;text-transform:uppercase">Description</th>'
-        +'<th style="width:13%;border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:9px 8px;background:#f8fafc;font-size:11px;text-transform:uppercase">Taxable</th>'
-        +'<th style="width:10%;border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:9px 8px;background:#f8fafc;font-size:11px;text-transform:uppercase">GST %</th>'
-        +'<th style="width:13%;border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:9px 8px;background:#f8fafc;font-size:11px;text-transform:uppercase">GST Amt</th>'
-        +'<th style="width:15%;border-bottom:1px solid #1f2937;padding:9px 8px;background:#f8fafc;font-size:11px;text-transform:uppercase">Total</th>'
-      +'</tr>'
-      +'<tr>'
-        +'<td style="border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:12px 10px;vertical-align:top;font-size:12px;line-height:1.6">'+serviceDesc+'<br>'
-           +(lr&&lr.description?('<strong>Goods:</strong> '+escHtml(lr.description)+'<br>'):'')
-           +(trips.length?('<strong>Trips Covered:</strong><br>'+trips.map(function(t){ return escHtml((t.tripCode||t.id)+' · '+(t.from||'-')+' to '+(t.to||'-')+' · Vehicle '+(t.vehicle||'-')); }).join('<br>')):(primary?('<strong>Vehicle:</strong> '+escHtml(primary.vehicle||'-')+'<br><strong>Route:</strong> '+escHtml((primary.from||'-')+' to '+(primary.to||'-'))):''))
+        +'<td style="width:58%;border-right:1px solid #1f2937;padding:8px 10px;vertical-align:top">'
+          +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:4px">Notes</div>'
+          +'<div style="font-size:10px;line-height:1.5">'+escHtml(rec.note||'Payment terms as agreed. Kindly quote invoice number while making payment.')+'</div>'
         +'</td>'
-        +'<td style="border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:12px 8px;text-align:right;font-size:12px;font-weight:700">'+fmt(rec.taxableAmount)+'</td>'
-        +'<td style="border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:12px 8px;text-align:center;font-size:12px;font-weight:700">'+escHtml((+rec.gstPct||0).toString())+'%</td>'
-        +'<td style="border-right:1px solid #1f2937;border-bottom:1px solid #1f2937;padding:12px 8px;text-align:right;font-size:12px;font-weight:700">'+fmt(rec.gstAmount)+'</td>'
-        +'<td style="border-bottom:1px solid #1f2937;padding:12px 8px;text-align:right;font-size:12px;font-weight:800;color:#1a5fa8">'+fmt(rec.totalAmount)+'</td>'
-      +'</tr>'
-    +'</table>'
-    +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
-      +'<tr>'
-        +'<td style="width:58%;border-right:1px solid #1f2937;padding:12px 14px;vertical-align:top">'
-          +'<div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">Notes</div>'
-          +'<div style="font-size:12px;line-height:1.65">'+escHtml(rec.note||'Payment terms as agreed. Kindly quote invoice number while making payment.')+'</div>'
+        +'<td style="width:18%;border-right:1px solid #1f2937;padding:8px 8px;vertical-align:top">'
+          +'<div style="font-size:9px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:4px">Summary</div>'
+          +'<div style="font-size:10px;line-height:1.6"><strong>Trips:</strong> '+tripIds.length+'<br><strong>Received:</strong> '+fmt(rec.receivedAmount)+'<br><strong>Balance:</strong> '+fmt(balance)+'<br><strong>Status:</strong> '+escHtml(inferInvoiceStatus(rec))+'</div>'
         +'</td>'
-        +'<td style="width:18%;border-right:1px solid #1f2937;padding:12px 12px;vertical-align:top">'
-          +'<div style="font-size:11px;font-weight:800;color:#64748b;text-transform:uppercase;margin-bottom:6px">Summary</div>'
-          +'<div style="font-size:12px;line-height:1.7"><strong>Trips:</strong> '+tripIds.length+'<br><strong>Received:</strong> '+fmt(rec.receivedAmount)+'<br><strong>Balance:</strong> '+fmt(balance)+'<br><strong>Status:</strong> '+escHtml(inferInvoiceStatus(rec))+'</div>'
-        +'</td>'
-        +'<td style="width:24%;padding:10px 12px;vertical-align:top;text-align:center">'
-          +'<div style="font-size:13px;font-weight:800;color:#ef1c1c;font-style:italic">For '+escHtml(BILL_FROM_COMPANY)+'</div>'
-          +'<div style="min-height:120px;display:flex;align-items:center;justify-content:center;padding:6px 0"><img src="'+BGSG_SIGN_DATA+'" alt="Authorized Signature" style="max-width:125px;max-height:115px;width:auto;height:auto"></div>'
-          +'<div style="font-size:13px;font-weight:800;color:#ef1c1c;font-style:italic">Authorised Signatory</div>'
+        +'<td style="width:24%;padding:8px 10px;vertical-align:top;text-align:center">'
+          +'<div style="font-size:11px;font-weight:800;color:#ef1c1c;font-style:italic">For '+escHtml(BILL_FROM_COMPANY)+'</div>'
+          +'<div style="min-height:90px;display:flex;align-items:center;justify-content:center;padding:4px 0"><img src="'+BGSG_SIGN_DATA+'" alt="Authorized Signature" style="max-width:110px;max-height:85px;width:auto;height:auto"></div>'
+          +'<div style="font-size:11px;font-weight:800;color:#ef1c1c;font-style:italic">Authorised Signatory</div>'
         +'</td>'
       +'</tr>'
     +'</table>'
@@ -5353,7 +5444,7 @@ function printInvoice(id){
   if(!rec.invoiceNo){ toast('Please enter invoice number'); return; }
   var w=window.open('', '_blank', 'width=1080,height=860');
   if(!w){ toast('Please allow pop-ups to print invoice'); return; }
-  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+escHtml(rec.invoiceNo||'Print')+'</title><style>@page{size:A4 portrait;margin:10mm}body{margin:0;background:#fff;padding:0}*{box-sizing:border-box}</style></head><body>'+buildInvoiceSheetHtml(rec)+'<script>window.onload=function(){setTimeout(function(){window.print();},250)};window.onafterprint=function(){window.close();};<\/script></body></html>';
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice '+escHtml(rec.invoiceNo||'Print')+'</title><style>@page{size:A4 portrait;margin:8mm}body{margin:0;background:#fff;padding:0;font-size:11px}*{box-sizing:border-box}div,table{max-width:100%}img{max-width:100%!important}</style></head><body>'+buildInvoiceSheetHtml(rec)+'<script>window.onload=function(){setTimeout(function(){window.print();},250)};window.onafterprint=function(){window.close();};<\/script></body></html>';
   w.document.open(); w.document.write(html); w.document.close();
 }
 function calcInvoiceTotals(){
