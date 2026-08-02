@@ -1676,6 +1676,29 @@ function sbGetFlex(table, query, cb){
     cb(err, data);
   });
 }
+// Fetches ALL rows for a table, paging past Supabase's default 1000-row-per-request
+// cap. Without this, any table that grows past 1000 rows silently loses data on
+// read — the request succeeds, just with an incomplete result, so it never shows
+// up as an error anywhere.
+function sbGetAllFlex(table, query, cb){
+  var PAGE=1000;
+  var all=[];
+  function stripLimitOffset(qs){
+    return (qs||'').split('&').filter(function(p){ return !/^limit=|^offset=/.test(p); }).join('&');
+  }
+  var baseQs = stripLimitOffset(query||'select=*');
+  function fetchPage(offset){
+    var qs = baseQs + (baseQs?'&':'') + 'limit='+PAGE+'&offset='+offset;
+    sbGetFlex(table, qs, function(err, rows){
+      if(err){ cb(err, all.length?all:(rows||[])); return; }
+      rows = rows||[];
+      all = all.concat(rows);
+      if(rows.length===PAGE){ fetchPage(offset+PAGE); }
+      else { cb(null, all); }
+    });
+  }
+  fetchPage(0);
+}
 function sbInsert(table, row, cb){
   sbFetch(SUPA_URL+'/rest/v1/'+table, {method:'POST', headers:SB_HDR, body:JSON.stringify(row)}, function(err, r){
     if(err){ if(cb) cb(err); return; }
@@ -3008,30 +3031,30 @@ function syncAllFromSupabase(silent, mode){
   var markBusy = mode==='core';
   if(markBusy) SYNC_BUSY=true;
   var coreTasks=[
-    {name:'trips', query:'select=id,date,trip_code,transporter,from_loc,to_loc,vehicle,type,invoice,customer,bill_to_consignee,bill_to_gst,driverno,amount,cng,mcd,other,infreight,pl,status,pod,created_at,updated_at&order=date.desc.nullslast,id.desc', apply:function(d){ APP.trips=applyPendingSync('trips',(d||[]).map(normalizeTrip),normalizeTrip).sort(tripSortCompare); }},
-    {name:'expenses', query:'select=id,trip_id,date,type,amount,note&order=date.desc.nullslast,id.desc', apply:function(d){
+    {name:'trips', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){ console.log('[sync] trips fetched from Supabase:', (d||[]).length, 'rows'); APP.trips=applyPendingSync('trips',(d||[]).map(normalizeTrip),normalizeTrip).sort(tripSortCompare); console.log('[sync] APP.trips after normalize:', APP.trips.length, 'rows'); }},
+    {name:'expenses', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){
       APP.expenses=(d||[]).map(normalizeExp).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
       // Recompute trip financials from linked expenses so drawer always shows true totals
       recompAllTripPL();
     }},
-    {name:'cash_entries', query:'select=id,entry_date,account_name,entry_type,source_party,category,vehicle,particulars,payment_mode,amount,note&order=entry_date.desc.nullslast,id.desc', apply:function(d){
+    {name:'cash_entries', query:'select=*&order=entry_date.desc.nullslast,id.desc', apply:function(d){
       APP.cashEntries=(d||[]).map(normalizeCashEntry).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
       APP.cashEntries.forEach(function(x){ ensureCashVehicle(x.vehicle); });
     }, soft:true},
-    {name:'cash_transfers', query:'select=id,transfer_date,from_account,to_account,amount,note&order=transfer_date.desc.nullslast,id.desc', apply:function(d){
+    {name:'cash_transfers', query:'select=*&order=transfer_date.desc.nullslast,id.desc', apply:function(d){
       APP.cashTransfers=(d||[]).map(normalizeCashTransfer).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); });
     }, soft:true},
-    {name:'drivers', query:'select=id,name&order=name.asc', apply:function(d){ DRIVERS=(d||[]).filter(function(x){return x && x.name;}).map(function(x){return {id:String(x.id),name:x.name};}); }, soft:true},
-    {name:'vehicle_documents', query:'select=id,vehicle,record_type,item_name,ref_no,issue_date,expiry_date,last_maintenance_date,next_due_date,alert_days,note&order=expiry_date.asc.nullslast,next_due_date.asc.nullslast,id.desc', apply:function(d){ APP.vehicleDocs=(d||[]).map(normalizeVehicleDoc); saveVehicleDocsLocal(); }, soft:true}
+    {name:'drivers', query:'select=*&order=name.asc', apply:function(d){ DRIVERS=(d||[]).filter(function(x){return x && x.name;}).map(function(x){return {id:String(x.id),name:x.name};}); }, soft:true},
+    {name:'vehicle_documents', query:'select=*&order=expiry_date.asc.nullslast,next_due_date.asc.nullslast,id.desc', apply:function(d){ APP.vehicleDocs=(d||[]).map(normalizeVehicleDoc); saveVehicleDocsLocal(); }, soft:true}
   ];
   var optionalTasks=[
-    {name:'salaries', query:'select=id,month,driver,amount,note&order=month.desc,id.desc', apply:function(d){ APP.salaries=(d||[]).map(normalizeSal).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
-    {name:'vehicle_expenses', query:'select=id,month,vehicle,type,amount,note&order=month.desc,id.desc', apply:function(d){ APP.vehicleExpenses=(d||[]).map(normalizeVehicleExp).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
-    {name:'agent_freights', query:'select=id,date,agent,vehicle,loading_amount,advance_paid,commission_pct,commission_amt,balance_due,balance_received,pod_status,note&order=date.desc.nullslast,id.desc', apply:function(d){ APP.agentFreights=applyPendingSync('agent_freights',(d||[]).map(normalizeAgentFreight),normalizeAgentFreight).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }, soft:true},
-    {name:'lr_entries', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,lr_no,party_invoice_no,vehicle_no,vehicle_type,from_loc,to_loc,consignor,consignee,no_of_articles,weight_charged,rate_per_kg,freight_amount,billing_type,goods_value,eway_bill_no,description,note,status'), apply:function(d){ APP.lrs=(d||[]).map(normalizeLr).sort(sortByDateDesc); }, soft:true},
-    {name:'customer_invoices', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,trip_ids,lr_id,invoice_no,customer,customer_gst,taxable_amount,gst_pct,gst_amount,total_amount,due_date,status,received_amount,note'), apply:function(d){ APP.invoices=(d||[]).map(normalizeInvoice).sort(sortByDateDesc); }, soft:true},
-    {name:'vendor_payments', query:'select=* &order=date.desc.nullslast,id.desc'.replace(' ','').replace('*','id,date,trip_id,lr_id,vendor_name,vendor_invoice_no,vehicle_no,payable_amount,paid_amount,balance_amount,due_date,paid_date,payment_mode,status,note'), apply:function(d){ APP.vendorPayments=(d||[]).map(normalizeVendorPayment).sort(sortByDateDesc); }, soft:true},
-    {name:'party_masters', query:'select=* &order=party_name.asc'.replace('*','id,party_name,address,gst_no,contact_person,phone,email,state,status,note'), apply:function(d){ APP.partyMasters=(d||[]).map(normalizePartyMaster).sort(function(a,b){ return String(a.partyName||'').localeCompare(String(b.partyName||'')); }); }, soft:true}
+    {name:'salaries', query:'select=*&order=month.desc,id.desc', apply:function(d){ APP.salaries=(d||[]).map(normalizeSal).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
+    {name:'vehicle_expenses', query:'select=*&order=month.desc,id.desc', apply:function(d){ APP.vehicleExpenses=(d||[]).map(normalizeVehicleExp).sort(function(a,b){ return String(b.month||'').localeCompare(String(a.month||'')); }); }, soft:true},
+    {name:'agent_freights', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){ APP.agentFreights=applyPendingSync('agent_freights',(d||[]).map(normalizeAgentFreight),normalizeAgentFreight).sort(function(a,b){ var bd=String(b.date||'').localeCompare(String(a.date||'')); if(bd!==0) return bd; return String(b.id||'').localeCompare(String(a.id||'')); }); }, soft:true},
+    {name:'lr_entries', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){ APP.lrs=(d||[]).map(normalizeLr).sort(sortByDateDesc); }, soft:true},
+    {name:'customer_invoices', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){ APP.invoices=(d||[]).map(normalizeInvoice).sort(sortByDateDesc); }, soft:true},
+    {name:'vendor_payments', query:'select=*&order=date.desc.nullslast,id.desc', apply:function(d){ APP.vendorPayments=(d||[]).map(normalizeVendorPayment).sort(sortByDateDesc); }, soft:true},
+    {name:'party_masters', query:'select=*&order=party_name.asc', apply:function(d){ APP.partyMasters=(d||[]).map(normalizePartyMaster).sort(function(a,b){ return String(a.partyName||'').localeCompare(String(b.partyName||'')); }); }, soft:true}
   ];
   var tasks = mode==='optional' ? optionalTasks : coreTasks;
   if(!tasks.length){ if(markBusy) SYNC_BUSY=false; return; }
@@ -3057,7 +3080,7 @@ function syncAllFromSupabase(silent, mode){
     }
   }
   tasks.forEach(function(task){
-    sbGetFlex(task.name, task.query, function(err, d){
+    sbGetAllFlex(task.name, task.query, function(err, d){
       if(!err){
         try{ task.apply(d||[]); saveAppCache(); scheduleUIRefresh(); }
         catch(applyErr){ err=applyErr; }
@@ -3066,7 +3089,7 @@ function syncAllFromSupabase(silent, mode){
       }
       if(err){
         var skipOk = !!task.soft || isMissingTableError(err) || isSchemaOrSelectError(err);
-        if(!skipOk) console.error('Supabase sync error:', task.name, err.message||err);
+        console[skipOk?'warn':'error']('Supabase sync error:', task.name, err.message||err);
         finishOne(task.name, skipOk ? null : err);
       } else {
         finishOne(task.name, null);
@@ -4734,16 +4757,21 @@ function saveTrip(){
     else if(!err){ clearPendingSync('trips', trip.id); saveAppCache(); syncSt('ok','Synced ✓'); toast(editTripId?'Trip updated!':'Trip added! P&L: '+fmt(trip.pl)); }
     else {
       var msg=sbErrText(err);
-      if(/23505/.test(msg) && /trip_code/i.test(msg) && codeRetries<5){
-        // Duplicate trip code (another device/session already used this number) —
-        // bump past every code we know about, locally and in this error, and retry.
+      if(/23505/.test(msg) && /trip_code/i.test(msg) && codeRetries<8){
+        // Duplicate trip code. The local cache's idea of "highest code so far"
+        // can be stale or incomplete (fresh browser, another device, gaps),
+        // so ask Supabase for the real current max instead of guessing locally.
         codeRetries++;
-        var maxKnown=(APP.trips||[]).reduce(function(m,t){ return Math.max(m, parseTrailingNum(t.tripCode||'')); },0);
-        trip.tripCode='BGSG'+zeroPad(Math.max(maxKnown, parseTrailingNum(trip.tripCode))+1,4);
-        var tcEl=document.getElementById('t-trip-code'); if(tcEl) tcEl.value=trip.tripCode;
-        if(editTripId) APP.trips=APP.trips.map(function(t){return String(t.id)===String(trip.id)?trip:t;}); else { var ix=APP.trips.findIndex(function(t){return String(t.id)===String(trip.id);}); if(ix>=0) APP.trips[ix]=trip; }
-        markPendingUpsert('trips', trip.id, trip); saveAppCache(); renderPage(curPage); populateTripFilters();
-        attemptSave();
+        sbGet('trips', 'select=trip_code&order=trip_code.desc.nullslast&limit=200', function(e2, rows){
+          var cloudMax=(rows||[]).reduce(function(m,r){ return Math.max(m, parseTrailingNum(r&&r.trip_code||'')); },0);
+          var localMax=(APP.trips||[]).reduce(function(m,t){ return Math.max(m, parseTrailingNum(t.tripCode||'')); },0);
+          var base=Math.max(cloudMax, localMax, parseTrailingNum(trip.tripCode));
+          trip.tripCode='BGSG'+zeroPad(base+codeRetries,4);
+          var tcEl=document.getElementById('t-trip-code'); if(tcEl) tcEl.value=trip.tripCode;
+          if(editTripId) APP.trips=APP.trips.map(function(t){return String(t.id)===String(trip.id)?trip:t;}); else { var ix=APP.trips.findIndex(function(t){return String(t.id)===String(trip.id);}); if(ix>=0) APP.trips[ix]=trip; }
+          markPendingUpsert('trips', trip.id, trip); saveAppCache(); renderPage(curPage); populateTripFilters();
+          attemptSave();
+        });
         return;
       }
       if(/column .*trip_code.* does not exist|Could not find.*trip_code|column .*bill_to_consignee.* does not exist|Could not find.*bill_to_consignee|column .*bill_to_gst.* does not exist|Could not find.*bill_to_gst|schema cache/i.test(msg)){
