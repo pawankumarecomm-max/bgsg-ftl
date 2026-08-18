@@ -1176,7 +1176,7 @@ tr:hover td{background:#f8fafc}
             </div>
           </div>
           <div class="card">
-            <div class="cardh"><div class="cardt">SKU Master</div><div class="coa-toolbar"><input class="sbox" id="coa-sku-search" placeholder="Search SKU" oninput="renderCoaSkuTable()" style="min-width:170px"><button class="btn btns btnp" onclick="openCoaSkuModal()">+ SKU</button></div></div>
+            <div class="cardh"><div class="cardt">SKU Master</div><div class="coa-toolbar"><input class="sbox" id="coa-sku-search" placeholder="Search SKU" oninput="renderCoaSkuTable()" style="min-width:170px"><button class="btn btns" onclick="coaSyncAllToCloud()">Sync All to Cloud</button><button class="btn btns btnp" onclick="openCoaSkuModal()">+ SKU</button></div></div>
             <div class="tw"><table><thead><tr><th>SKU</th><th>Item</th><th>Client</th><th>Size</th><th>Ply</th><th>Moisture</th><th>Actions</th></tr></thead><tbody id="coa-sku-tbody"></tbody></table></div>
           </div>
           <div class="card">
@@ -5736,26 +5736,59 @@ function coaSkuToRow(s){ return { id:s.id, sku_name:s.skuName, item_name:s.itemN
 function rowToCoaSku(r){ return { id:r.id, skuName:r.sku_name||r.skuName||'', itemName:r.item_name||r.itemName||'', typePackaging:r.type_packaging||r.typePackaging||'CORRUGATED BOX', pattern:r.pattern||'RSC', boxSize:r.box_size||r.boxSize||'', ply:r.ply||'', separatorSize:r.separator_size||r.separatorSize||'', separatorPly:r.separator_ply||r.separatorPly||'', topSpec:r.top_spec||r.topSpec||'', topPaper:r.top_paper||r.topPaper||'', layer2Spec:r.layer2_spec||r.layer2Spec||'', layer2Paper:r.layer2_paper||r.layer2Paper||'', layer3Spec:r.layer3_spec||r.layer3Spec||'', layer3Paper:r.layer3_paper||r.layer3Paper||'', layer4Spec:r.layer4_spec||r.layer4Spec||'', layer4Paper:r.layer4_paper||r.layer4Paper||'', layer5Spec:r.layer5_spec||r.layer5Spec||'', layer5Paper:r.layer5_paper||r.layer5Paper||'', burstingStrength:r.bursting_strength||r.burstingStrength||'', compressionStrength:r.compression_strength||r.compressionStrength||'', moisture:r.moisture||'11%', sideJoints:r.side_joints||r.sideJoints||'', printingType:r.printing_type||r.printingType||'', colourName:r.colour_name||r.colourName||'', defaultClient:r.default_client||r.defaultClient||'', clientName:r.default_client_name||r.clientName||'', clientAddress:r.default_client_address||r.clientAddress||'', clientGstin:r.default_client_gstin||r.clientGstin||'', defaultPo:r.default_po||r.defaultPo||'', defaultInvoice:r.default_invoice||r.defaultInvoice||'' }; }
 function coaReportToRow(r){ return { id:r.id, coa_no:r.coaNo, coa_date:r.date, po_no:r.poNo, invoice_no:r.invoiceNo, client_details:r.clientDetails, prepared_by:r.preparedBy, notes:r.notes, moisture_final:r.moistureFinal, sku_id:r.skuId, sku_name:r.skuName, sku_snapshot:r.sku||{} }; }
 function rowToCoaReport(r){ return { id:r.id, coaNo:r.coa_no||r.coaNo||'', date:String(r.coa_date||r.date||'').slice(0,10), poNo:r.po_no||r.poNo||'', invoiceNo:r.invoice_no||r.invoiceNo||'', clientDetails:r.client_details||r.clientDetails||'', preparedBy:r.prepared_by||r.preparedBy||'', notes:r.notes||'', moistureFinal:r.moisture_final||r.moistureFinal||'', skuId:r.sku_id||r.skuId||'', skuName:r.sku_name||r.skuName||'', sku:r.sku_snapshot||r.sku||{}, createdAt:r.created_at||r.createdAt||new Date().toISOString() }; }
-function coaWarnCloud(err){ if(COA_CLOUD_WARNED) return; COA_CLOUD_WARNED=true; if(isMissingTableError && isMissingTableError(err)) toast('COA Supabase tables missing. Run the SQL schema first.'); else console.warn(err); }
+function coaWarnCloud(err){
+  console.error('COA cloud sync error:', err);
+  if(typeof syncSt==='function') syncSt('err','COA sync error');
+  if(COA_CLOUD_WARNED) return; COA_CLOUD_WARNED=true;
+  if(isMissingTableError && isMissingTableError(err)) toast('COA Supabase tables missing (coa_skus / coa_reports). Run the SQL schema first.');
+  else toast('COA sync error: '+sbErrText(err));
+}
 function coaMergeById(local, cloud){ var map={}; (cloud||[]).forEach(function(x){ if(x&&x.id) map[x.id]=x; }); (local||[]).forEach(function(x){ if(x&&x.id&&!map[x.id]) map[x.id]=x; }); return Object.keys(map).map(function(k){ return map[k]; }); }
 function coaLoadCloudOnce(){
-  if(COA_CLOUD_LOADED||COA_CLOUD_BUSY||typeof sbGetFlex!=='function') return;
+  if(COA_CLOUD_LOADED||COA_CLOUD_BUSY||typeof sbGetFlex!=='function'){ if(typeof sbGetFlex!=='function') coaWarnCloud('sbGetFlex not available'); return; }
   COA_CLOUD_BUSY=true;
   sbGetFlex('coa_skus','select=*&order=sku_name.asc',function(err,rows){
-    if(err){ COA_CLOUD_BUSY=false; coaWarnCloud(err); return; }
-    if(rows&&rows.length){ COA_SKUS=coaMergeById(COA_SKUS, rows.map(rowToCoaSku)); }
+    if(err){ coaWarnCloud(err); }
+    else if(rows&&rows.length){ COA_SKUS=coaMergeById(COA_SKUS, rows.map(rowToCoaSku)); }
     sbGetFlex('coa_reports','select=*&order=created_at.desc',function(err2,rows2){
       COA_CLOUD_BUSY=false; COA_CLOUD_LOADED=true;
       if(err2){ coaWarnCloud(err2); }
       else if(rows2&&rows2.length){ COA_REPORTS=coaMergeById(COA_REPORTS, rows2.map(rowToCoaReport)); }
+      if(!err&&!err2 && typeof syncSt==='function') syncSt('ok','Synced ✓');
       saveCOAData(); populateCoaSkuSelect(); renderCoaSkuTable(); renderCoaHistory(); coaUpdateKpis();
       var sel=document.getElementById('coa-sku'); if(sel&&!sel.value&&COA_SKUS[0]) sel.value=COA_SKUS[0].id; coaRefreshPreview(true);
     });
   });
 }
-function coaCloudSaveSku(s){ if(typeof sbUpsert!=='function') return; sbUpsert('coa_skus', coaSkuToRow(s), function(err){ if(err) coaWarnCloud(err); }); }
-function coaCloudSaveReport(r){ if(typeof sbUpsert!=='function') return; sbUpsert('coa_reports', coaReportToRow(r), function(err){ if(err) coaWarnCloud(err); }); }
-function coaCloudDelete(table,id){ if(typeof sbDelete!=='function') return; sbDelete(table,id,function(err){ if(err) coaWarnCloud(err); }); }
+function coaCloudSaveSku(s){ if(typeof sbUpsert!=='function'){ coaWarnCloud('sbUpsert not available'); return; } sbUpsert('coa_skus', coaSkuToRow(s), function(err){ if(err) coaWarnCloud(err); else if(typeof syncSt==='function') syncSt('ok','Synced ✓'); }); }
+// Pushes every SKU and every saved report currently held locally (including the
+// built-in defaults and anything created before cloud sync existed) up to
+// Supabase. Nothing local is deleted or overwritten — this is push-only, and
+// each item is sent with sbUpsert so re-running it is always safe.
+function coaSyncAllToCloud(){
+  if(typeof sbUpsert!=='function'){ coaWarnCloud('sbUpsert not available'); return; }
+  var skus=(COA_SKUS||[]).slice();
+  var reports=(COA_REPORTS||[]).slice();
+  var total=skus.length+reports.length;
+  if(!total){ toast('Nothing to sync'); return; }
+  var done=0, failed=0;
+  toast('Syncing '+skus.length+' SKUs and '+reports.length+' COA records…');
+  function checkDone(){
+    done++;
+    if(done>=total){
+      if(failed) { if(typeof syncSt==='function') syncSt('err', failed+' item(s) failed to sync'); toast('Sync finished with '+failed+' error(s) — see console'); }
+      else { if(typeof syncSt==='function') syncSt('ok','Synced ✓'); toast('All '+total+' COA records synced to cloud'); }
+    }
+  }
+  skus.forEach(function(s){
+    sbUpsert('coa_skus', coaSkuToRow(s), function(err){ if(err){ failed++; coaWarnCloud(err); } checkDone(); });
+  });
+  reports.forEach(function(r){
+    sbUpsert('coa_reports', coaReportToRow(r), function(err){ if(err){ failed++; coaWarnCloud(err); } checkDone(); });
+  });
+}
+function coaCloudSaveReport(r){ if(typeof sbUpsert!=='function'){ coaWarnCloud('sbUpsert not available'); return; } sbUpsert('coa_reports', coaReportToRow(r), function(err){ if(err) coaWarnCloud(err); else if(typeof syncSt==='function') syncSt('ok','Synced ✓'); }); }
+function coaCloudDelete(table,id){ if(typeof sbDelete!=='function'){ coaWarnCloud('sbDelete not available'); return; } sbDelete(table,id,function(err){ if(err) coaWarnCloud(err); else if(typeof syncSt==='function') syncSt('ok','Synced ✓'); }); }
 function renderCOA(){
   initCOAData();
   populateCoaSkuSelect();
@@ -5840,7 +5873,7 @@ function coaRefreshPreview(keepMoisture){
   var prev=document.getElementById('coa-preview'); if(!prev) return;
   prev.innerHTML=coaBuildPrintable(coaReportFromForm());
 }
-function coaDateShort(d){ if(!d) return ''; var p=String(d).split('-'); if(p.length===3) return p[1]+'/'+p[2]+'/'+p[0].slice(-2); return d; }
+function coaDateShort(d){ if(!d) return ''; var p=String(d).split('-'); if(p.length===3) return p[2]+'/'+p[1]+'/'+p[0].slice(-2); return d; }
 function coaBuildPrintable(r){
   var s=r.sku||{}; function val(x){return x?coaNl(x):'-';}
   var rows='';
